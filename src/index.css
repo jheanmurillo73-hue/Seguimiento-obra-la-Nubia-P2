@@ -46,6 +46,9 @@
 
   --font-headline: "Hanken Grotesk", sans-serif;
   --font-body: "Inter", sans-serif;
+  
+  /* Touch target size (Apple HIG: 44px minimum) */
+  --touch-target-size: 44px;
 }
 
 body {
@@ -78,3 +81,214 @@ body {
   background: #727783;
 }
 
+/* ============================================
+   MOBILE & RESPONSIVE OPTIMIZATIONS
+   ============================================ */
+
+/* Safe area support for notched devices (iOS) */
+@supports (padding: max(0px)) {
+  .safe-area-inset-top {
+    padding-top: max(1rem, env(safe-area-inset-top));
+  }
+  
+  .safe-area-inset-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+  
+  .safe-area-inset-left {
+    padding-left: max(1rem, env(safe-area-inset-left));
+  }
+  
+  .safe-area-inset-right {
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
+  
+  .safe-area-full {
+    padding-top: max(1rem, env(safe-area-inset-top));
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
+}
+
+/* Touch-friendly target size (min 44px for iOS) */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Prevent zoom on input focus (iOS) */
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+
+/* Improve mobile scrolling performance */
+.momentum-scroll {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent text selection on long press (mobile) */
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Full viewport height for mobile (avoiding address bar) */
+@media (max-width: 768px) {
+  html, body {
+    height: 100vh;
+    height: 100dvh;
+  }
+  
+  /* Prevent layout shift from scrollbar */
+  body {
+    overflow-x: hidden;
+  }
+  
+  /* Ensure modals work properly */
+  .modal-open body {
+    overflow: hidden;
+  }
+  
+  /* Mobile-friendly inputs */
+  input[type="number"],
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  textarea {
+    font-size: 16px; /* Prevent zoom on focus */
+    padding: 12px;
+    border-radius: 8px;
+  }
+  
+  /* Stack layout for forms */
+  .form-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  /* Full-width buttons on mobile */
+  .btn-mobile-full {
+    width: 100%;
+    padding: 12px;
+    min-height: 48px;
+  }
+  
+  /* Avoid horizontal scroll */
+  .overflow-hidden-mobile {
+    overflow: hidden;
+  }
+}
+
+/* Landscape mode adjustments */
+@media (max-height: 500px) and (orientation: landscape) {
+  .hide-on-landscape {
+    display: none;
+  }
+  
+  /* Reduce vertical spacing in landscape */
+  .landscape-compact {
+    gap: 0.5rem;
+  }
+}
+
+/* Tablet (medium screens) */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .tablet-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+}
+
+/* Prevent iOS rubber band scroll */
+body {
+  position: fixed;
+  width: 100%;
+  overflow: hidden;
+}
+
+#root {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* Animation performance for mobile */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* High DPI screen optimizations */
+@media (min-device-pixel-ratio: 2) {
+  .high-dpi-border {
+    border-width: 0.5px;
+  }
+}
+
+/* Dark mode support for mobile */
+@media (prefers-color-scheme: dark) {
+  /* Adjust colors for dark mode if needed */
+  body {
+    background-color: #0f172a;
+    color: #f1f5f9;
+  }
+}
+
+/* Gesture feedback */
+.tap-feedback {
+  transition: background-color 150ms, transform 150ms;
+}
+
+.tap-feedback:active {
+  transform: scale(0.98);
+  opacity: 0.8;
+}
+
+/* Loading state animations */
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.loading-pulse {
+  animation: pulse-slow 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Improved tap target feedback */
+.tap-ring:active {
+  outline: 3px solid rgba(0, 77, 153, 0.3);
+  outline-offset: 2px;
+}
+
+/* Swipe hint animation */
+@keyframes swipe-hint {
+  0%, 100% {
+    transform: translateX(0);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translateX(12px);
+    opacity: 1;
+  }
+}
+
+.swipe-hint {
+  animation: swipe-hint 1.5s ease-in-out infinite;
+}
