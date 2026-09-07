@@ -1,0 +1,21 @@
+{
+  "name": "photovault-mobile-setup",
+  "version": "1.0.0",
+  "description": "Mobile optimization setup tasks for PhotoVault Pro",
+  "scripts": {
+    "setup:mobile": "bash scripts/setup-mobile.sh",
+    "dev": "vite --port=3000 --host=0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test:mobile": "echo 'Open DevTools (F12) and toggle device toolbar (Ctrl+Shift+M)'",
+    "lighthouse": "echo 'Run in Chrome: chrome://inspect or use web.dev/measure'",
+    "pwa:check": "echo 'Visit DevTools > Application > Manifest and Service Workers'"
+  },
+  "keywords": [
+    "mobile",
+    "pwa",
+    "responsive",
+    "ios",
+    "android"
+  ]
+}
