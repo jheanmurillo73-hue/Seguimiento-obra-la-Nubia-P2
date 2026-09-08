@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useDeviceDetection } from '../../hooks/useDeviceDetection';
 import { InspectionPhoto } from '../../types';
-import { BottomSheet } from './BottomSheet';
+import { BottomSheet } from '../BottomSheet';
 
 interface MobilePhotoDetailProps {
   photo: InspectionPhoto;

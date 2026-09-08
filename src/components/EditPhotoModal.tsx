@@ -1044,9 +1044,9 @@ export const EditPhotoModal: React.FC<EditPhotoModalProps> = ({
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
                         ejecStatus
                           ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                          : 'bg-amber-50 text-amber-800 border-amber-300'
+                          : 'bg-blue-50 text-[#004d99] border-blue-300'
                       }`}>
-                        {ejecStatus ? 'Ejecutado' : 'No Ejecutado'}
+                        {ejecStatus ? 'Ejecutado' : 'Presupuestado'}
                       </span>
                       <span className="font-mono text-[11px] text-[#527284]">
                         Presup: <strong className="text-[#071e27]">{presup} m</strong> · Real: <strong className={ejecStatus ? 'text-[#1b6d24]' : 'text-amber-700'}>{ejec} m</strong> ({pct}%)

@@ -144,7 +144,7 @@ export const isConduitEjecutado = (conduit: Partial<PipeConduit>): boolean => {
       : parseFloat(String(conduit.metersEjecutados || '0').replace(',', '.'));
     return num > 0;
   }
-  return true;
+  return false;
 };
 
 export const getConduitEjecutadoMeters = (
@@ -637,10 +637,26 @@ export const getPhotoRealLinearMeters = (photo: InspectionPhoto): {
     let totalDistEjec = 0;
     let maxMult = 1;
 
+    const photoProgress = getPhotoProgressPercentage(photo) / 100;
+    const isPhotoNotStarted = photo.executionStatus === 'No iniciado' || photo.isEjecutado === false;
+
     conduits.forEach((c) => {
       const presup = getConduitPresupuestadoMeters(c, parseFloat(String(photo.metraje || '0')) || 0);
-      const isEjec = isConduitEjecutado(c);
-      const ejec = isEjec ? getConduitEjecutadoMeters(c, presup) : 0;
+      let ejec: number;
+      if (isPhotoNotStarted) {
+        ejec = 0;
+      } else if (c.isEjecutado === false) {
+        ejec = 0;
+      } else if (c.metersEjecutados !== undefined) {
+        const num = typeof c.metersEjecutados === 'number'
+          ? c.metersEjecutados
+          : parseFloat(String(c.metersEjecutados || '0').replace(',', '.'));
+        ejec = Number.isFinite(num) && num >= 0 ? num : 0;
+      } else if (c.isEjecutado === true) {
+        ejec = presup;
+      } else {
+        ejec = presup * photoProgress;
+      }
       const mult = extractTramoMultiplier(c.configuration);
 
       totalLinearPresup += mult * presup;

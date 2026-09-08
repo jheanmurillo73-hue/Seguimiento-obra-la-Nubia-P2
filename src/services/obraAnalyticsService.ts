@@ -54,6 +54,13 @@ export interface SectorMetric {
   metrosAvancePonderado: number; // 0 - 100%
   distanciaTrazaTotal: number; // Distancia física de traza / zanja (sin multiplicar)
   distanciaTrazaEjecutada: number;
+  metrosPresupuestoBaseline?: number;
+  metrosMtBaseline?: number;
+  metrosBtBaseline?: number;
+  metrosDatosBaseline?: number;
+  metrosMtEjecutados?: number;
+  metrosBtEjecutados?: number;
+  metrosDatosEjecutados?: number;
 
   // Actas
   itemsPorActa: Record<string, number>;
@@ -68,11 +75,16 @@ export interface BaselineCanalizacionSector {
   planDatos4: number;
   planBT6: number;
   planTotal: number;
-  // Seguimiento Ejecución Real
+  // Seguimiento Ejecución Real (Cantidades de Avance Físico [m])
   ejecMT4: number;
   ejecDatos4: number;
   ejecBT6: number;
   ejecTotal: number;
+  // Conteo físico de canalizaciones
+  tramosTerminados?: number;
+  tramosEnProceso?: number;
+  tramosTotal?: number;
+  tramosIntervenidos?: number;
   // Porcentajes
   pctMT4: number;
   pctDatos4: number;
@@ -98,6 +110,11 @@ export interface BaselineCamarasSector {
   ejecDatos: number;
   ejecBT: number;
   ejecTotal: number;
+  // Conteo físico de cámaras
+  camarasTerminadas?: number;
+  camarasEnProceso?: number;
+  camarasTotal?: number;
+  camarasIntervenidas?: number;
   // Porcentajes
   pctMT: number;
   pctDatos: number;
@@ -446,7 +463,8 @@ export function calculateObraMetrics(
   const buildMetricForItems = (
     items: typeof allParsed,
     key: 'TODOS' | 'I1' | 'I2' | 'TRONCAL' | 'OTRO',
-    customName?: string
+    customName?: string,
+    isActaFilterActive: boolean = false
   ): SectorMetric => {
     const s = createEmptySectorMetric(key, customName);
     let camPonderado = 0;
@@ -546,6 +564,32 @@ export function calculateObraMetrics(
       }
     }
 
+    // Línea Base Oficial presupuestada de Tubería / Canalización
+    const baseCanal = key === 'TODOS' ? OFFICIAL_BASELINE.canalizacion.TOTAL
+      : key === 'I1' ? OFFICIAL_BASELINE.canalizacion.I1
+      : key === 'I2' ? OFFICIAL_BASELINE.canalizacion.I2
+      : key === 'TRONCAL' ? OFFICIAL_BASELINE.canalizacion.TRONCAL
+      : null;
+
+    if (baseCanal) {
+      s.metrosPresupuestoBaseline = baseCanal.total;
+      s.metrosMtBaseline = baseCanal.mt4;
+      s.metrosBtBaseline = baseCanal.bt6;
+      s.metrosDatosBaseline = baseCanal.datos4;
+
+      if (!isActaFilterActive) {
+        // Metros Lineales Reales Totales de Línea Base: 11,614 m para Toda la Obra (3,683 m I1, 4,341 m I2, 3,590 m TRONCAL)
+        s.metrosTotales = baseCanal.total;
+
+        // Metros Lineales Ejecutados: Realidad física instalada en campo (1,516.8 m para Toda la Obra: 305.2m MT + 1211.6m BT)
+        const manualCanalTotal = Math.round((baseCanal.manualMT4 + baseCanal.manualDatos4 + baseCanal.manualBT6) * 10) / 10;
+        s.metrosEjecutados = manualCanalTotal;
+        s.metrosMtEjecutados = baseCanal.manualMT4;
+        s.metrosBtEjecutados = baseCanal.manualBT6;
+        s.metrosDatosEjecutados = baseCanal.manualDatos4;
+      }
+    }
+
     s.camarasAvancePonderado = s.camarasTotal > 0 ? Math.round((s.camarasEjecutadas / s.camarasTotal) * 1000) / 10 : 0;
     s.mtAvance = s.mtTotal > 0 ? Math.round((s.mtEjecutadas / s.mtTotal) * 1000) / 10 : 0;
     s.btAvance = s.btTotal > 0 ? Math.round((s.btEjecutadas / s.btTotal) * 1000) / 10 : 0;
@@ -556,7 +600,11 @@ export function calculateObraMetrics(
     s.metrosPendientes = Math.max(0, Math.round((s.metrosTotales - s.metrosEjecutados) * 100) / 100);
     s.metrosAvancePonderado = s.metrosTotales > 0 ? Math.round((s.metrosEjecutados / s.metrosTotales) * 1000) / 10 : 0;
     s.distanciaTrazaTotal = Math.round(s.distanciaTrazaTotal * 100) / 100;
-    s.distanciaTrazaEjecutada = Math.round(s.distanciaTrazaEjecutada * 100) / 100;
+    if (baseCanal && !isActaFilterActive && s.metrosTotales > 0 && s.distanciaTrazaTotal > 0) {
+      s.distanciaTrazaEjecutada = Math.round(((s.metrosEjecutados / s.metrosTotales) * s.distanciaTrazaTotal) * 100) / 100;
+    } else {
+      s.distanciaTrazaEjecutada = Math.round(s.distanciaTrazaEjecutada * 100) / 100;
+    }
 
     return s;
   };
@@ -584,7 +632,8 @@ export function calculateObraMetrics(
     (filterActa !== 'TODAS' ? ` · ${filterActa}` : '') +
     (soloPendientes ? ' (Solo Pendientes)' : '');
 
-  const activeSectorMetric = buildMetricForItems(activeItems, filterArea, activeLabel);
+  const isActaFiltered = filterActa !== 'TODAS';
+  const activeSectorMetric = buildMetricForItems(activeItems, filterArea, activeLabel, isActaFiltered);
 
   // Filtrar elementos para la tabla y gráficos de detalle
   const filteredItems = activeItems.map((item) => item.photo);
@@ -696,42 +745,24 @@ export function calculateObraMetrics(
     const sItems = allParsed.filter((i) => i.sectorKey === k && i.isTuberia);
     const base = OFFICIAL_BASELINE.canalizacion[k];
 
-    // Cálculos de ejecución real en el sistema
-    let ejecMT = 0;
-    let ejecDatos = 0;
-    let ejecBT = 0;
-
-    sItems.forEach((i) => {
-      const conduits = i.photo.pipeConduits;
-      if (conduits && conduits.length > 0) {
-        conduits.forEach((c) => {
-          const mult = extractTramoMultiplier(c.configuration);
-          const presup = getConduitPresupuestadoMeters(c, parseFloat(String(i.photo.metraje || '0')) || 0);
-          const isEjec = isConduitEjecutado(c);
-          const ejec = isEjec ? getConduitEjecutadoMeters(c, presup * (i.progressPct / 100)) : 0;
-          const linearEjec = mult * ejec;
-          if (c.networkType === 'media_tension') ejecMT += linearEjec;
-          else if (c.networkType === 'datos') ejecDatos += linearEjec;
-          else if (c.networkType === 'baja_tension') ejecBT += linearEjec;
-        });
-      } else {
-        const m = i.metrajeEjecutado;
-        if (i.isMT) ejecMT += m;
-        else if (i.isDatos) ejecDatos += m;
-        else if (i.isBT) ejecBT += m;
-      }
-    });
-
-    // Si los tramos en el sistema están en proceso (50%), pero la medición de campo del usuario ya registró el tramo ejecutado en acta:
-    const finalMT = Math.round(ejecMT * 10) / 10;
-    const finalDatos = Math.round(ejecDatos * 10) / 10;
-    const finalBT = Math.round(ejecBT * 10) / 10;
+    // Cuentas de Avance Físico verificadas de obra:
+    // Intersección 1 (I1): 1,225.4 m ejecutados (MT 4": 217.2 m, Datos 4": 0 m [Presupuestado], BT 6": 1,008.2 m)
+    // Intersección 2 (I2): 291.4 m ejecutados (MT 4": 88.0 m, Datos 4": 0 m [Presupuestado], BT 6": 203.4 m)
+    // Troncal: 0 m ejecutados
+    // Total Ejecutado Oficial: 1,516.8 m (Datos se mantiene fijo en Línea Base y no suma a cantidades ejecutadas)
+    const finalMT = base.manualMT4;
+    const finalDatos = base.manualDatos4;
+    const finalBT = base.manualBT6;
     const finalTotal = Math.round((finalMT + finalDatos + finalBT) * 10) / 10;
 
     const pctMT = Math.round((finalMT / (base.mt4 || 1)) * 1000) / 10;
     const pctDatos = Math.round((finalDatos / (base.datos4 || 1)) * 1000) / 10;
     const pctBT = Math.round((finalBT / (base.bt6 || 1)) * 1000) / 10;
-    const prom = Math.round(((pctMT + pctDatos + pctBT) / 3) * 10) / 10;
+    const prom = base.manualPromedio || Math.round(((pctMT + pctDatos + pctBT) / 3) * 10) / 10;
+
+    const sTramosTerminados = sItems.length > 0 ? sItems.filter((i) => i.isTerminado).length : (k === 'I1' ? 4 : k === 'I2' ? 2 : 0);
+    const sTramosEnProceso = sItems.length > 0 ? sItems.filter((i) => i.isEnProceso).length : 0;
+    const sTramosTotal = sItems.length > 0 ? sItems.length : (k === 'I1' ? 4 : k === 'I2' ? 2 : 0);
 
     return {
       sectorKey: k,
@@ -744,6 +775,10 @@ export function calculateObraMetrics(
       ejecDatos4: finalDatos,
       ejecBT6: finalBT,
       ejecTotal: finalTotal,
+      tramosTerminados: sTramosTerminados,
+      tramosEnProceso: sTramosEnProceso,
+      tramosTotal: sTramosTotal,
+      tramosIntervenidos: sTramosTerminados + sTramosEnProceso,
       pctMT4: pctMT,
       pctDatos4: pctDatos,
       pctBT6: pctBT,
@@ -758,6 +793,9 @@ export function calculateObraMetrics(
   const baselineCamaras: BaselineCamarasSector[] = sectorKeys.map((k) => {
     const sItems = allParsed.filter((i) => i.sectorKey === k && i.isCamara);
     const base = OFFICIAL_BASELINE.camaras[k];
+    const sCamarasTerminadas = sItems.filter((i) => i.isTerminado).length;
+    const sCamarasEnProceso = sItems.filter((i) => i.isEnProceso).length;
+    const sCamarasTotal = sItems.length;
 
     let mtAvanceEquiv = 0;
     let datosAvanceEquiv = 0;
@@ -791,6 +829,10 @@ export function calculateObraMetrics(
       ejecDatos: finalDatos,
       ejecBT: finalBT,
       ejecTotal: finalTotal,
+      camarasTerminadas: sCamarasTerminadas,
+      camarasEnProceso: sCamarasEnProceso,
+      camarasTotal: sCamarasTotal,
+      camarasIntervenidas: sCamarasTerminadas + sCamarasEnProceso,
       pctMT: pctMT,
       pctDatos: pctDatos,
       pctBT: pctBT,

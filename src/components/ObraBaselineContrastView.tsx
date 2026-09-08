@@ -1,50 +1,80 @@
 import React from 'react';
-import { BaselineCanalizacionSector, BaselineCamarasSector } from '../services/obraAnalyticsService';
+import {
+  BaselineCanalizacionSector,
+  BaselineCamarasSector,
+  ObraGlobalMetrics,
+} from '../services/obraAnalyticsService';
 
 interface ObraBaselineContrastViewProps {
   baselineCanalizacion: BaselineCanalizacionSector[];
   baselineCamaras: BaselineCamarasSector[];
+  globalMetrics?: ObraGlobalMetrics;
   onNavigateToMap: () => void;
 }
 
 export const ObraBaselineContrastView: React.FC<ObraBaselineContrastViewProps> = ({
   baselineCanalizacion,
   baselineCamaras,
+  globalMetrics,
   onNavigateToMap,
 }) => {
   // Totales de Canalización
   const totalPlanCanalizacion = baselineCanalizacion.reduce((acc, r) => acc + r.planTotal, 0);
   const totalEjecCanalizacion = baselineCanalizacion.reduce((acc, r) => acc + r.ejecTotal, 0);
-  const totalManualCanalizacion = baselineCanalizacion.reduce((acc, r) => acc + (r.manualMT4 + r.manualDatos4 + r.manualBT6), 0);
-  const avgCanalizacionPct = totalPlanCanalizacion > 0 ? Math.round((totalEjecCanalizacion / totalPlanCanalizacion) * 1000) / 10 : 0;
+  const avgCanalizacionPct =
+    totalPlanCanalizacion > 0
+      ? Math.round((totalEjecCanalizacion / totalPlanCanalizacion) * 1000) / 10
+      : 0;
+
+  // Cantidad de Canalizaciones Terminadas y en Proceso
+  const rawTramosTerminados = baselineCanalizacion.reduce(
+    (acc, r) => acc + (r.tramosTerminados || 0),
+    0
+  );
+  const rawTramosEnProceso = baselineCanalizacion.reduce(
+    (acc, r) => acc + (r.tramosEnProceso || 0),
+    0
+  );
+  const displayTramosTerminados = rawTramosTerminados;
+  const displayTramosEnProceso = rawTramosEnProceso;
+  const displayTramosIntervenidos = displayTramosTerminados + displayTramosEnProceso;
 
   // Totales de Cámaras
   const totalPlanCamaras = baselineCamaras.reduce((acc, r) => acc + r.planTotal, 0);
   const totalEjecCamaras = baselineCamaras.reduce((acc, r) => acc + r.ejecTotal, 0);
-  const totalFabricadasCamaras = baselineCamaras.reduce((acc, r) => acc + r.cajasFabricadas, 0);
-  const avgCamarasPct = totalPlanCamaras > 0 ? Math.round((totalEjecCamaras / totalPlanCamaras) * 1000) / 10 : 0;
+  const avgCamarasPct =
+    totalPlanCamaras > 0 ? Math.round((totalEjecCamaras / totalPlanCamaras) * 1000) / 10 : 0;
+
+  // Cantidad de Cámaras Terminadas y en Proceso
+  const totalCamarasTerminadas =
+    globalMetrics?.camarasTerminadas ??
+    baselineCamaras.reduce((acc, r) => acc + (r.camarasTerminadas || 0), 0);
+  const totalCamarasEnProceso =
+    globalMetrics?.camarasEnProceso ??
+    baselineCamaras.reduce((acc, r) => acc + (r.camarasEnProceso || 0), 0);
+  const totalCamarasIntervenidas = totalCamarasTerminadas + totalCamarasEnProceso;
 
   return (
     <div className="space-y-6">
-      {/* 1. Encabezado de Validación con Cuentas Manuales */}
+      {/* 1. Encabezado de Contraste: Línea Base vs. Avance Físico */}
       <div className="bg-white border border-[#c2c6d4] rounded-2xl p-5 shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4 mb-5">
           <div className="flex items-center gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-[#004d99]">
               <span className="material-symbols-outlined text-[24px]">balance</span>
             </span>
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base sm:text-lg font-bold text-[#0f172a]">
-                  Contraste: Cuentas Manuales de Campo vs. Sistema y Línea Base
+                  Contraste: Línea Base de Obra vs. Avance Físico Real
                 </h2>
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-800 border border-emerald-300">
-                  <span className="material-symbols-outlined text-[14px]">verified</span>
-                  100% Validado
+                <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-bold text-blue-900 border border-blue-300">
+                  <span className="material-symbols-outlined text-[14px]">analytics</span>
+                  Línea Base vs. Ejecución
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Contraste directo de los metrajes de canalización y conteo de cámaras de diseño contra las cuentas manuales del usuario.
+                Valores de referencia de la línea base de diseño contrastados directamente contra las cantidades de avance físico ejecutado en obra.
               </p>
             </div>
           </div>
@@ -59,46 +89,111 @@ export const ObraBaselineContrastView: React.FC<ObraBaselineContrastViewProps> =
           </button>
         </div>
 
-        {/* Tarjetas KPI de Contraste */}
+        {/* 4 Tarjetas KPI */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Canalización Presupuesto</span>
-            <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-2xl font-black text-slate-900">{totalPlanCanalizacion.toFixed(1)} m</span>
+          {/* Card 1: Canalización Línea Base (Valor Consolidado) */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Canalización Presupuesto
+                </span>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-700">
+                  Línea Base
+                </span>
+              </div>
+              <div className="mt-1.5 flex items-baseline gap-2">
+                <span className="text-2xl font-black text-slate-900">
+                  {totalPlanCanalizacion.toFixed(1)} m
+                </span>
+              </div>
             </div>
-            <div className="mt-1 text-[11px] text-slate-500">Línea base de diseño de obra</div>
+            <div className="mt-2 text-[11px] text-slate-600 border-t border-slate-200/70 pt-1.5">
+              Valor consolidado de la línea base (I1: 3,683 m · I2: 4,341 m · Troncal: 3,590 m)
+            </div>
           </div>
 
-          <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-4">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700">Canalización Ejecutada</span>
-            <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-2xl font-black text-blue-900">{totalEjecCanalizacion.toFixed(1)} m</span>
-              <span className="text-xs font-bold text-blue-700 font-mono">({avgCanalizacionPct}%)</span>
+          {/* Card 2: Canalización Ejecutada (Cantidades Avance Físico) */}
+          <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-4 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700">
+                  Canalización Ejecutada
+                </span>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800">
+                  Avance Físico
+                </span>
+              </div>
+              <div className="mt-1.5 flex items-baseline gap-2">
+                <span className="text-2xl font-black text-blue-900">
+                  {totalEjecCanalizacion.toFixed(1)} m
+                </span>
+                <span className="text-xs font-bold text-blue-700 font-mono">
+                  ({avgCanalizacionPct}%)
+                </span>
+              </div>
             </div>
-            <div className="mt-1 text-[11px] text-blue-700 font-medium">Manual: {totalManualCanalizacion.toFixed(1)} m (Coincidencia exacta)</div>
+            <div className="mt-2 text-[11px] text-blue-800 font-medium flex items-center gap-1 border-t border-blue-200/70 pt-1.5">
+              <span className="material-symbols-outlined text-[14px]">tune</span>
+              <span>
+                {displayTramosIntervenidos > 0 ? (
+                  <>
+                    <strong>{displayTramosIntervenidos}</strong> canalizaciones ({displayTramosTerminados} terminadas · {displayTramosEnProceso} en proceso)
+                  </>
+                ) : (
+                  'Canalizaciones terminadas y/o en proceso'
+                )}
+              </span>
+            </div>
           </div>
 
-          <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800">Cajas Fabricadas en Taller</span>
-            <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-2xl font-black text-amber-900">{totalFabricadasCamaras} un</span>
-              <span className="text-xs font-bold text-amber-700">Taller/Obra</span>
+          {/* Card 3: Cámaras Terminadas */}
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">
+                  Cámaras Terminadas
+                </span>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">
+                  100% Ejecutadas
+                </span>
+              </div>
+              <div className="mt-1.5 flex items-baseline gap-2">
+                <span className="text-2xl font-black text-emerald-900">
+                  {totalCamarasTerminadas} un
+                </span>
+              </div>
             </div>
-            <div className="mt-1 text-[11px] text-amber-800 font-medium">I1: 21 cajas · I2: 16 cajas</div>
+            <div className="mt-2 text-[11px] text-emerald-800 font-medium border-t border-emerald-200/70 pt-1.5">
+              Cámaras con construcción y verificación completadas
+            </div>
           </div>
 
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">Cámaras Ejecutadas</span>
-            <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-2xl font-black text-emerald-900">{totalEjecCamaras.toFixed(1)} un</span>
-              <span className="text-xs font-bold text-emerald-700 font-mono">({avgCamarasPct}%)</span>
+          {/* Card 4: Cámaras en Proceso */}
+          <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800">
+                  Cámaras en Proceso
+                </span>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
+                  En Ejecución
+                </span>
+              </div>
+              <div className="mt-1.5 flex items-baseline gap-2">
+                <span className="text-2xl font-black text-amber-900">
+                  {totalCamarasEnProceso} un
+                </span>
+              </div>
             </div>
-            <div className="mt-1 text-[11px] text-emerald-800 font-medium">De {totalPlanCamaras} cámaras de diseño</div>
+            <div className="mt-2 text-[11px] text-amber-800 font-medium border-t border-amber-200/70 pt-1.5">
+              Total intervenidas: <strong>{totalCamarasIntervenidas} un</strong> (de {totalPlanCamaras} de diseño)
+            </div>
           </div>
         </div>
       </div>
 
-      {/* 2. Tabla Detallada: CANALIZACIONES (Línea Base vs. Seguimiento de Ejecución) */}
+      {/* 2. Tabla Detallada: CANALIZACIONES (Línea Base vs. Avance Físico) */}
       <div className="bg-white border border-[#c2c6d4] rounded-2xl p-5 shadow-xs space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
           <div>
@@ -107,7 +202,7 @@ export const ObraBaselineContrastView: React.FC<ObraBaselineContrastViewProps> =
               1. Contraste de Canalizaciones: Línea Base vs. Ejecución Real (m)
             </h3>
             <p className="text-xs text-slate-500">
-              Comparativa por tipo de red (MT 4", Datos 4", BT 6") y validación contra cuentas manuales del usuario.
+              Valores de referencia de la línea base contra las cantidades de avance físico ejecutadas por tipo de red (MT 4", Datos 4", BT 6").
             </p>
           </div>
         </div>
@@ -116,18 +211,29 @@ export const ObraBaselineContrastView: React.FC<ObraBaselineContrastViewProps> =
           <table className="w-full text-xs text-left">
             <thead>
               <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
-                <th rowSpan={2} className="py-2.5 px-3 border-r border-slate-200">Sector</th>
-                <th colSpan={4} className="py-2 px-3 text-center border-r border-slate-200 bg-slate-200/60 text-slate-800">
-                  Línea Base (Presupuesto / Diseño) [m]
+                <th rowSpan={2} className="py-2.5 px-3 border-r border-slate-200 align-middle">
+                  Sector
                 </th>
-                <th colSpan={4} className="py-2 px-3 text-center border-r border-slate-200 bg-blue-100/70 text-blue-900">
-                  Seguimiento Ejecución (Sistema) [m]
+                <th
+                  colSpan={4}
+                  className="py-2 px-3 text-center border-r border-slate-200 bg-slate-200/70 text-slate-800"
+                >
+                  <div className="font-bold">Línea Base (Presupuesto / Diseño) [m]</div>
+                  <div className="text-[10px] font-normal text-slate-600">Valores de Referencia Línea Base</div>
                 </th>
-                <th colSpan={4} className="py-2 px-3 text-center border-r border-slate-200 bg-emerald-100/70 text-emerald-900">
-                  % Avance Físico
+                <th
+                  colSpan={4}
+                  className="py-2 px-3 text-center border-r border-slate-200 bg-blue-100/80 text-blue-950"
+                >
+                  <div className="font-bold">Avance Físico (Cantidades Ejecutadas) [m]</div>
+                  <div className="text-[10px] font-normal text-blue-800">Cantidades del Avance Físico Real</div>
                 </th>
-                <th colSpan={2} className="py-2 px-3 text-center bg-purple-100/70 text-purple-900">
-                  Cuentas Manuales
+                <th
+                  colSpan={4}
+                  className="py-2 px-3 text-center bg-emerald-100/70 text-emerald-900"
+                >
+                  <div className="font-bold">% Avance Físico</div>
+                  <div className="text-[10px] font-normal text-emerald-800">Cumplimiento vs. Línea Base</div>
                 </th>
               </tr>
               <tr className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 text-[11px]">
@@ -135,71 +241,54 @@ export const ObraBaselineContrastView: React.FC<ObraBaselineContrastViewProps> =
                 <th className="py-1.5 px-2.5 text-right">MT (4")</th>
                 <th className="py-1.5 px-2.5 text-right">Datos (4")</th>
                 <th className="py-1.5 px-2.5 text-right">BT (6")</th>
-                <th className="py-1.5 px-2.5 text-right border-r border-slate-200 font-bold text-slate-900">Total</th>
-                {/* Sistema */}
+                <th className="py-1.5 px-2.5 text-right border-r border-slate-200 font-bold text-slate-900 bg-slate-100/50">
+                  Total
+                </th>
+                {/* Avance Físico */}
                 <th className="py-1.5 px-2.5 text-right text-blue-800">MT (4")</th>
                 <th className="py-1.5 px-2.5 text-right text-blue-800">Datos (4")</th>
                 <th className="py-1.5 px-2.5 text-right text-blue-800">BT (6")</th>
-                <th className="py-1.5 px-2.5 text-right border-r border-slate-200 font-bold text-blue-950">Total</th>
-                {/* Avance */}
+                <th className="py-1.5 px-2.5 text-right border-r border-slate-200 font-bold text-blue-950 bg-blue-50/50">
+                  Total
+                </th>
+                {/* % Avance */}
                 <th className="py-1.5 px-2 text-right text-emerald-800">% MT</th>
                 <th className="py-1.5 px-2 text-right text-emerald-800">% Datos</th>
                 <th className="py-1.5 px-2 text-right text-emerald-800">% BT</th>
-                <th className="py-1.5 px-2.5 text-right border-r border-slate-200 font-bold text-emerald-950">Prom. Área</th>
-                {/* Manuales */}
-                <th className="py-1.5 px-2.5 text-right font-mono text-purple-900">Manual (m)</th>
-                <th className="py-1.5 px-2.5 text-center text-purple-900">Estado</th>
+                <th className="py-1.5 px-2.5 text-right font-bold text-emerald-950 bg-emerald-50/50">
+                  Prom. Área
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 font-mono text-xs">
-              {baselineCanalizacion.map((r) => {
-                const manualTotal = r.manualMT4 + r.manualDatos4 + r.manualBT6;
-                const isExact = Math.abs(r.ejecTotal - manualTotal) < 1;
-                return (
-                  <tr key={r.sectorKey} className="hover:bg-slate-50 transition">
-                    <td className="py-2.5 px-3 font-bold font-sans text-slate-800 border-r border-slate-200">
-                      {r.sectorName}
-                    </td>
-                    {/* Línea Base */}
-                    <td className="py-2.5 px-2.5 text-right text-slate-600">{r.planMT4.toFixed(1)}</td>
-                    <td className="py-2.5 px-2.5 text-right text-slate-600">{r.planDatos4.toFixed(1)}</td>
-                    <td className="py-2.5 px-2.5 text-right text-slate-600">{r.planBT6.toFixed(1)}</td>
-                    <td className="py-2.5 px-2.5 text-right font-bold text-slate-900 border-r border-slate-200 bg-slate-50/70">
-                      {r.planTotal.toFixed(1)}
-                    </td>
-                    {/* Ejecución Sistema */}
-                    <td className="py-2.5 px-2.5 text-right text-blue-700">{r.ejecMT4.toFixed(1)}</td>
-                    <td className="py-2.5 px-2.5 text-right text-blue-700">{r.ejecDatos4.toFixed(1)}</td>
-                    <td className="py-2.5 px-2.5 text-right text-blue-700">{r.ejecBT6.toFixed(1)}</td>
-                    <td className="py-2.5 px-2.5 text-right font-bold text-blue-900 border-r border-slate-200 bg-blue-50/40">
-                      {r.ejecTotal.toFixed(1)}
-                    </td>
-                    {/* % Avance */}
-                    <td className="py-2.5 px-2 text-right text-emerald-700">{r.pctMT4}%</td>
-                    <td className="py-2.5 px-2 text-right text-emerald-700">{r.pctDatos4}%</td>
-                    <td className="py-2.5 px-2 text-right text-emerald-700">{r.pctBT6}%</td>
-                    <td className="py-2.5 px-2.5 text-right font-bold text-emerald-800 border-r border-slate-200 bg-emerald-50/40">
-                      {r.promedioArea}%
-                    </td>
-                    {/* Cuentas Manuales */}
-                    <td className="py-2.5 px-2.5 text-right text-purple-900 font-bold">
-                      {manualTotal.toFixed(1)}
-                    </td>
-                    <td className="py-2.5 px-2.5 text-center font-sans">
-                      {isExact ? (
-                        <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                          <span className="material-symbols-outlined text-[12px]">check_circle</span>
-                          Exacto
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-800">
-                          {r.ejecTotal > manualTotal ? `+${(r.ejecTotal - manualTotal).toFixed(1)} m` : `-${(manualTotal - r.ejecTotal).toFixed(1)} m`}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+              {baselineCanalizacion.map((r) => (
+                <tr key={r.sectorKey} className="hover:bg-slate-50 transition">
+                  <td className="py-2.5 px-3 font-bold font-sans text-slate-800 border-r border-slate-200">
+                    {r.sectorName}
+                  </td>
+                  {/* Línea Base */}
+                  <td className="py-2.5 px-2.5 text-right text-slate-600">{r.planMT4.toFixed(1)}</td>
+                  <td className="py-2.5 px-2.5 text-right text-slate-600">{r.planDatos4.toFixed(1)}</td>
+                  <td className="py-2.5 px-2.5 text-right text-slate-600">{r.planBT6.toFixed(1)}</td>
+                  <td className="py-2.5 px-2.5 text-right font-bold text-slate-900 border-r border-slate-200 bg-slate-50/70">
+                    {r.planTotal.toFixed(1)}
+                  </td>
+                  {/* Avance Físico (Cantidades Ejecutadas) */}
+                  <td className="py-2.5 px-2.5 text-right text-blue-700">{r.ejecMT4.toFixed(1)}</td>
+                  <td className="py-2.5 px-2.5 text-right text-blue-700">{r.ejecDatos4.toFixed(1)}</td>
+                  <td className="py-2.5 px-2.5 text-right text-blue-700">{r.ejecBT6.toFixed(1)}</td>
+                  <td className="py-2.5 px-2.5 text-right font-bold text-blue-900 border-r border-slate-200 bg-blue-50/40">
+                    {r.ejecTotal.toFixed(1)}
+                  </td>
+                  {/* % Avance Físico */}
+                  <td className="py-2.5 px-2 text-right text-emerald-700">{r.pctMT4}%</td>
+                  <td className="py-2.5 px-2 text-right text-emerald-700">{r.pctDatos4}%</td>
+                  <td className="py-2.5 px-2 text-right text-emerald-700">{r.pctBT6}%</td>
+                  <td className="py-2.5 px-2.5 text-right font-bold text-emerald-800 bg-emerald-50/40">
+                    {r.promedioArea}%
+                  </td>
+                </tr>
+              ))}
 
               {/* Fila Total General */}
               <tr className="bg-slate-100/90 font-bold border-t-2 border-slate-300">
@@ -219,7 +308,7 @@ export const ObraBaselineContrastView: React.FC<ObraBaselineContrastViewProps> =
                 <td className="py-3 px-2.5 text-right font-black text-slate-900 border-r border-slate-200 bg-slate-200/50">
                   {totalPlanCanalizacion.toFixed(1)}
                 </td>
-                {/* Sistema */}
+                {/* Avance Físico */}
                 <td className="py-3 px-2.5 text-right text-blue-900">
                   {baselineCanalizacion.reduce((a, b) => a + b.ejecMT4, 0).toFixed(1)}
                 </td>
@@ -236,17 +325,8 @@ export const ObraBaselineContrastView: React.FC<ObraBaselineContrastViewProps> =
                 <td colSpan={3} className="py-3 px-2 text-center text-emerald-800 font-sans text-[11px]">
                   Ponderado global
                 </td>
-                <td className="py-3 px-2.5 text-right font-black text-emerald-950 border-r border-slate-200 bg-emerald-100/60">
+                <td className="py-3 px-2.5 text-right font-black text-emerald-950 bg-emerald-100/60">
                   {avgCanalizacionPct}%
-                </td>
-                {/* Manual Total */}
-                <td className="py-3 px-2.5 text-right text-purple-900 font-black">
-                  {totalManualCanalizacion.toFixed(1)}
-                </td>
-                <td className="py-3 px-2.5 text-center font-sans">
-                  <span className="inline-flex items-center gap-0.5 rounded px-2 py-0.5 text-[10px] font-bold bg-emerald-600 text-white">
-                    100% OK
-                  </span>
                 </td>
               </tr>
             </tbody>
@@ -254,16 +334,16 @@ export const ObraBaselineContrastView: React.FC<ObraBaselineContrastViewProps> =
         </div>
       </div>
 
-      {/* 3. Tabla Detallada: CÁMARAS Y CAJAS FABRICADAS */}
+      {/* 3. Tabla Detallada: CÁMARAS (Línea Base vs. Avance Físico) */}
       <div className="bg-white border border-[#c2c6d4] rounded-2xl p-5 shadow-xs space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
           <div>
             <h3 className="text-sm font-bold text-[#0f172a] uppercase tracking-wide flex items-center gap-2">
               <span className="material-symbols-outlined text-[18px] text-[#004d99]">videocam</span>
-              2. Contraste de Cámaras: Presupuesto vs. Cajas Fabricadas vs. Avance Físico
+              2. Contraste de Cámaras: Línea Base vs. Avance Físico (Unidades)
             </h3>
             <p className="text-xs text-slate-500">
-              Contabilización de las 37 cajas fabricadas en taller (21 en I1, 16 en I2) y comparación con diseño y cuentas manuales.
+              Seguimiento exclusivo de cámaras terminadas y en proceso por tipo de red (MT, Datos, BT) frente al presupuesto de diseño.
             </p>
           </div>
         </div>
@@ -272,21 +352,29 @@ export const ObraBaselineContrastView: React.FC<ObraBaselineContrastViewProps> =
           <table className="w-full text-xs text-left">
             <thead>
               <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
-                <th rowSpan={2} className="py-2.5 px-3 border-r border-slate-200">Sector</th>
-                <th colSpan={4} className="py-2 px-3 text-center border-r border-slate-200 bg-slate-200/60 text-slate-800">
-                  Línea Base (Diseño / Presupuesto)
+                <th rowSpan={2} className="py-2.5 px-3 border-r border-slate-200 align-middle">
+                  Sector
                 </th>
-                <th rowSpan={2} className="py-2 px-3 text-center border-r border-slate-200 bg-amber-100/80 text-amber-950 font-black">
-                  Cajas Fabricadas (Taller)
+                <th
+                  colSpan={4}
+                  className="py-2 px-3 text-center border-r border-slate-200 bg-slate-200/70 text-slate-800"
+                >
+                  <div className="font-bold">Línea Base (Diseño / Presupuesto)</div>
+                  <div className="text-[10px] font-normal text-slate-600">Unidades de Diseño</div>
                 </th>
-                <th colSpan={4} className="py-2 px-3 text-center border-r border-slate-200 bg-blue-100/70 text-blue-900">
-                  Seguimiento Ejecución (Sistema)
+                <th
+                  colSpan={4}
+                  className="py-2 px-3 text-center border-r border-slate-200 bg-blue-100/80 text-blue-950"
+                >
+                  <div className="font-bold">Avance Físico (Cámaras Ejecutadas)</div>
+                  <div className="text-[10px] font-normal text-blue-800">Unidades Intervenidas en Obra</div>
                 </th>
-                <th colSpan={2} className="py-2 px-3 text-center bg-emerald-100/70 text-emerald-900">
-                  Avance Físico
-                </th>
-                <th rowSpan={2} className="py-2 px-3 text-center bg-purple-100/70 text-purple-900 font-bold border-l border-slate-200">
-                  Cuentas Manuales
+                <th
+                  colSpan={3}
+                  className="py-2 px-3 text-center bg-emerald-100/70 text-emerald-900"
+                >
+                  <div className="font-bold">Estado en Obra</div>
+                  <div className="text-[10px] font-normal text-emerald-800">Terminadas vs. En Proceso</div>
                 </th>
               </tr>
               <tr className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 text-[11px]">
@@ -294,71 +382,58 @@ export const ObraBaselineContrastView: React.FC<ObraBaselineContrastViewProps> =
                 <th className="py-1.5 px-2.5 text-right">MT</th>
                 <th className="py-1.5 px-2.5 text-right">Datos</th>
                 <th className="py-1.5 px-2.5 text-right">BT</th>
-                <th className="py-1.5 px-2.5 text-right border-r border-slate-200 font-bold text-slate-900">Total</th>
-                {/* Sistema */}
+                <th className="py-1.5 px-2.5 text-right border-r border-slate-200 font-bold text-slate-900 bg-slate-100/50">
+                  Total
+                </th>
+                {/* Avance Físico */}
                 <th className="py-1.5 px-2.5 text-right text-blue-800">MT</th>
                 <th className="py-1.5 px-2.5 text-right text-blue-800">Datos</th>
                 <th className="py-1.5 px-2.5 text-right text-blue-800">BT</th>
-                <th className="py-1.5 px-2.5 text-right border-r border-slate-200 font-bold text-blue-950">Total</th>
-                {/* Avance */}
-                <th className="py-1.5 px-2 text-right text-emerald-800">Avance (un)</th>
-                <th className="py-1.5 px-2.5 text-right font-bold text-emerald-950">% Avance</th>
+                <th className="py-1.5 px-2.5 text-right border-r border-slate-200 font-bold text-blue-950 bg-blue-50/50">
+                  Total
+                </th>
+                {/* Estado */}
+                <th className="py-1.5 px-2 text-right text-emerald-800">Terminadas</th>
+                <th className="py-1.5 px-2 text-right text-amber-800">En Proceso</th>
+                <th className="py-1.5 px-2.5 text-right font-bold text-emerald-950 bg-emerald-50/50">
+                  % Avance
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 font-mono text-xs">
-              {baselineCamaras.map((r) => {
-                const manualTotal = r.manualMT + r.manualDatos + r.manualBT;
-                return (
-                  <tr key={r.sectorKey} className="hover:bg-slate-50 transition">
-                    <td className="py-2.5 px-3 font-bold font-sans text-slate-800 border-r border-slate-200">
-                      {r.sectorName}
-                    </td>
-                    {/* Línea Base */}
-                    <td className="py-2.5 px-2.5 text-right text-slate-600">{r.planMT}</td>
-                    <td className="py-2.5 px-2.5 text-right text-slate-600">{r.planDatos}</td>
-                    <td className="py-2.5 px-2.5 text-right text-slate-600">{r.planBT}</td>
-                    <td className="py-2.5 px-2.5 text-right font-bold text-slate-900 border-r border-slate-200 bg-slate-50/70">
-                      {r.planTotal}
-                    </td>
+              {baselineCamaras.map((r) => (
+                <tr key={r.sectorKey} className="hover:bg-slate-50 transition">
+                  <td className="py-2.5 px-3 font-bold font-sans text-slate-800 border-r border-slate-200">
+                    {r.sectorName}
+                  </td>
+                  {/* Línea Base */}
+                  <td className="py-2.5 px-2.5 text-right text-slate-600">{r.planMT}</td>
+                  <td className="py-2.5 px-2.5 text-right text-slate-600">{r.planDatos}</td>
+                  <td className="py-2.5 px-2.5 text-right text-slate-600">{r.planBT}</td>
+                  <td className="py-2.5 px-2.5 text-right font-bold text-slate-900 border-r border-slate-200 bg-slate-50/70">
+                    {r.planTotal}
+                  </td>
 
-                    {/* Cajas Fabricadas */}
-                    <td className="py-2.5 px-3 text-center font-bold text-amber-900 border-r border-slate-200 bg-amber-50/50">
-                      {r.cajasFabricadas > 0 ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-mono font-bold">
-                          <span className="material-symbols-outlined text-[13px]">inventory_2</span>
-                          {r.cajasFabricadas} cajas
-                        </span>
-                      ) : (
-                        <span className="text-slate-400 font-sans">0 (No aplica)</span>
-                      )}
-                    </td>
+                  {/* Avance Físico */}
+                  <td className="py-2.5 px-2.5 text-right text-blue-700">{r.ejecMT.toFixed(1)}</td>
+                  <td className="py-2.5 px-2.5 text-right text-blue-700">{r.ejecDatos.toFixed(1)}</td>
+                  <td className="py-2.5 px-2.5 text-right text-blue-700">{r.ejecBT.toFixed(1)}</td>
+                  <td className="py-2.5 px-2.5 text-right font-bold text-blue-900 border-r border-slate-200 bg-blue-50/40">
+                    {r.ejecTotal.toFixed(1)}
+                  </td>
 
-                    {/* Seguimiento Sistema */}
-                    <td className="py-2.5 px-2.5 text-right text-blue-700">{r.ejecMT.toFixed(1)}</td>
-                    <td className="py-2.5 px-2.5 text-right text-blue-700">{r.ejecDatos.toFixed(1)}</td>
-                    <td className="py-2.5 px-2.5 text-right text-blue-700">{r.ejecBT.toFixed(1)}</td>
-                    <td className="py-2.5 px-2.5 text-right font-bold text-blue-900 border-r border-slate-200 bg-blue-50/40">
-                      {r.ejecTotal.toFixed(1)}
-                    </td>
-
-                    {/* % Avance */}
-                    <td className="py-2.5 px-2 text-right text-emerald-700 font-bold">
-                      {r.ejecTotal.toFixed(1)} un
-                    </td>
-                    <td className="py-2.5 px-2.5 text-right font-black text-emerald-800 bg-emerald-50/40">
-                      {r.promedioArea}%
-                    </td>
-
-                    {/* Cuentas Manuales */}
-                    <td className="py-2.5 px-3 text-center text-purple-900 font-bold border-l border-slate-200">
-                      <span className="font-mono">{manualTotal.toFixed(1)} un</span>
-                      <span className="block text-[10px] text-emerald-700 font-sans font-normal">
-                        ({r.manualPromedioArea}% manual)
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
+                  {/* Estado Físico */}
+                  <td className="py-2.5 px-2 text-right text-emerald-800 font-bold">
+                    {r.camarasTerminadas ?? 0} un
+                  </td>
+                  <td className="py-2.5 px-2 text-right text-amber-800 font-bold">
+                    {r.camarasEnProceso ?? 0} un
+                  </td>
+                  <td className="py-2.5 px-2.5 text-right font-black text-emerald-800 bg-emerald-50/40">
+                    {r.promedioArea}%
+                  </td>
+                </tr>
+              ))}
 
               {/* Fila Total General */}
               <tr className="bg-slate-100/90 font-bold border-t-2 border-slate-300">
@@ -379,15 +454,7 @@ export const ObraBaselineContrastView: React.FC<ObraBaselineContrastViewProps> =
                   {totalPlanCamaras}
                 </td>
 
-                {/* Total Cajas Fabricadas */}
-                <td className="py-3 px-3 text-center border-r border-slate-200 bg-amber-100/80 font-black text-amber-950">
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-200 text-amber-950 font-mono font-black text-xs">
-                    <span className="material-symbols-outlined text-[15px]">inventory_2</span>
-                    {totalFabricadasCamaras} Cajas Taller
-                  </span>
-                </td>
-
-                {/* Sistema */}
+                {/* Avance Físico */}
                 <td className="py-3 px-2.5 text-right text-blue-900">
                   {baselineCamaras.reduce((a, b) => a + b.ejecMT, 0).toFixed(1)}
                 </td>
@@ -401,19 +468,15 @@ export const ObraBaselineContrastView: React.FC<ObraBaselineContrastViewProps> =
                   {totalEjecCamaras.toFixed(1)}
                 </td>
 
-                {/* Avance */}
+                {/* Estado Físico */}
                 <td className="py-3 px-2 text-right text-emerald-900 font-black">
-                  {totalEjecCamaras.toFixed(1)}
+                  {totalCamarasTerminadas} un
+                </td>
+                <td className="py-3 px-2 text-right text-amber-900 font-black">
+                  {totalCamarasEnProceso} un
                 </td>
                 <td className="py-3 px-2.5 text-right font-black text-emerald-950 bg-emerald-100/60">
                   {avgCamarasPct}%
-                </td>
-
-                {/* Manual */}
-                <td className="py-3 px-3 text-center border-l border-slate-200">
-                  <span className="inline-flex items-center gap-0.5 rounded px-2 py-0.5 text-[10px] font-bold bg-emerald-600 text-white font-sans">
-                    100% Coincidente
-                  </span>
                 </td>
               </tr>
             </tbody>
@@ -421,21 +484,32 @@ export const ObraBaselineContrastView: React.FC<ObraBaselineContrastViewProps> =
         </div>
       </div>
 
-      {/* 4. Resumen Conclusivo de Auditoría */}
+      {/* 4. Resumen Conclusivo del Contraste */}
       <div className="rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50/90 to-indigo-50/70 p-4 text-xs text-blue-950">
         <div className="flex items-start gap-3">
-          <span className="material-symbols-outlined text-[22px] text-blue-700 shrink-0 mt-0.5">info</span>
+          <span className="material-symbols-outlined text-[22px] text-blue-700 shrink-0 mt-0.5">
+            verified
+          </span>
           <div>
-            <h4 className="font-bold text-sm text-blue-900">Conclusiones del Contraste</h4>
-            <ul className="mt-1.5 space-y-1 list-disc list-inside text-blue-800">
+            <h4 className="font-bold text-sm text-blue-900">Conclusiones del Contraste de Obra</h4>
+            <ul className="mt-1.5 space-y-1 list-disc list-inside text-blue-900">
               <li>
-                <strong>Cajas Fabricadas:</strong> Se registran oficialmente <strong>37 unidades fabricadas</strong> (21 para Intersección 1 y 16 para Intersección 2), correspondientes a la meta de prefabricación en taller.
+                <strong>Línea Base Consolidada:</strong> Representa un total presupuestado de{' '}
+                <strong>{totalPlanCanalizacion.toFixed(1)} m</strong> de canalizaciones y{' '}
+                <strong>{totalPlanCamaras} unidades</strong> de cámaras de inspección distribuidas en
+                Intersección 1, Intersección 2 y Troncal Principal.
               </li>
               <li>
-                <strong>Canalizaciones:</strong> La ejecución de <strong>1,419.0 m</strong> frente al presupuesto de <strong>1,747.0 m</strong> representa un <strong>81.2%</strong> de avance global en canalizaciones subterráneas.
+                <strong>Avance Físico de Canalizaciones:</strong> Las cantidades ejecutadas alcanzan{' '}
+                <strong>{totalEjecCanalizacion.toFixed(1)} m</strong> ({avgCanalizacionPct}% del
+                diseño), consolidando las canalizaciones terminadas y en proceso.
               </li>
               <li>
-                <strong>Cámaras de Inspección:</strong> El avance ponderado de cámaras alcanza <strong>95.1%</strong> (58.0 cámaras efectivas sobre las 61 presupuestadas).
+                <strong>Cámaras de Inspección:</strong> Seguimiento focalizado en{' '}
+                <strong>{totalCamarasTerminadas} cámaras terminadas</strong> y{' '}
+                <strong>{totalCamarasEnProceso} en proceso</strong>, totalizando{' '}
+                <strong>{totalCamarasIntervenidas} cámaras intervenidas</strong> sobre el universo de{' '}
+                {totalPlanCamaras} cámaras de la línea base.
               </li>
             </ul>
           </div>

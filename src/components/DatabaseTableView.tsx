@@ -49,9 +49,14 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
   const [filterType, setFilterType] = useState<string>('all');
   const [filterSector, setFilterSector] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterElementType, setFilterElementType] = useState<'all' | 'camara' | 'tuberia'>('all');
   const [filterCameraCode, setFilterCameraCode] = useState<string>('all');
   const [filterTramo, setFilterTramo] = useState<string>('all');
   const [filterSync, setFilterSync] = useState<string>('all');
+
+  // Mobile view mode ('cards' or 'compact') & filters collapse toggle
+  const [mobileViewMode, setMobileViewMode] = useState<'cards' | 'compact'>('cards');
+  const [showAdvancedFiltersMobile, setShowAdvancedFiltersMobile] = useState<boolean>(false);
 
   // Sorting
   const [sortField, setSortField] = useState<SortField>('date');
@@ -227,6 +232,13 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
         }
       }
 
+      // Element Type Filter (Cámara vs Tramo)
+      if (filterElementType !== 'all') {
+        if (getElementType(photo) !== filterElementType) {
+          return false;
+        }
+      }
+
       // Camera Code Filter
       if (filterCameraCode !== 'all') {
         if (photo.cameraCode !== filterCameraCode) {
@@ -285,7 +297,65 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
 
       return true;
     });
-  }, [photos, filterType, filterSector, filterStatus, filterCameraCode, filterTramo, filterSync, searchTerm]);
+  }, [photos, filterType, filterSector, filterStatus, filterElementType, filterCameraCode, filterTramo, filterSync, searchTerm]);
+
+  // Quick summary counts for filter chips
+  const quickCounts = useMemo(() => {
+    let enProceso = 0;
+    let terminado = 0;
+    let camaras = 0;
+    let tramos = 0;
+    photos.forEach((p) => {
+      if (p.executionStatus === 'Terminado') terminado++;
+      else if (p.executionStatus === 'En proceso') enProceso++;
+      const type = getElementType(p);
+      if (type === 'camara') camaras++;
+      else if (type === 'tuberia') tramos++;
+    });
+    return {
+      enProceso,
+      terminado,
+      camaras,
+      tramos,
+      total: photos.length,
+    };
+  }, [photos]);
+
+  // Total active filters count (excluding search if preferred, or including)
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (filterType !== 'all') count++;
+    if (filterSector !== 'all') count++;
+    if (filterStatus !== 'all') count++;
+    if (filterElementType !== 'all') count++;
+    if (filterCameraCode !== 'all') count++;
+    if (filterTramo !== 'all') count++;
+    if (filterSync !== 'all') count++;
+    if (searchTerm.trim()) count++;
+    return count;
+  }, [filterType, filterSector, filterStatus, filterElementType, filterCameraCode, filterTramo, filterSync, searchTerm]);
+
+  // Reset all filters
+  const handleResetFilters = () => {
+    setSearchTerm('');
+    setFilterType('all');
+    setFilterSector('all');
+    setFilterStatus('all');
+    setFilterElementType('all');
+    setFilterCameraCode('all');
+    setFilterTramo('all');
+    setFilterSync('all');
+  };
+
+  // Quick toggle status for mobile card
+  const handleTogglePhotoStatus = (photo: InspectionPhoto) => {
+    const nextStatus: ExecutionStatus = photo.executionStatus === 'Terminado' ? 'En proceso' : 'Terminado';
+    onUpdatePhoto({
+      ...photo,
+      executionStatus: nextStatus,
+      progressPercentage: nextStatus === 'Terminado' ? 100 : 50,
+    });
+  };
 
   // Sorted list
   const sortedPhotos = useMemo(() => {
@@ -516,305 +586,596 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* ----------------- HEADER & ACTIONS ----------------- */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-[#c2c6d4] shadow-xs">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-[#e6f6ff] text-[#004d99] flex items-center justify-center border border-[#cfe6f2]">
-              <span className="material-symbols-outlined text-[24px]">database</span>
+      <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-[#c2c6d4] shadow-xs space-y-3.5">
+        {/* Top Row: Title + Mobile View Switcher */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-[#e6f6ff] text-[#004d99] flex items-center justify-center border border-[#cfe6f2] shrink-0">
+              <span className="material-symbols-outlined text-[22px] sm:text-[24px]">database</span>
             </div>
-            <div>
-              <h1 className="font-['Hanken_Grotesk'] font-bold text-xl sm:text-2xl text-[#071e27]">
+            <div className="min-w-0">
+              <h1 className="font-['Hanken_Grotesk'] font-bold text-lg sm:text-2xl text-[#071e27] truncate">
                 Base de Datos de Obra
               </h1>
-              <p className="text-xs sm:text-sm text-[#424752] font-['Inter']">
-                Inventario técnico tabulado de cámaras, tramos de canalización, metrajes y elementos del plano
+              <p className="text-xs sm:text-sm text-[#424752] font-['Inter'] line-clamp-1 sm:line-clamp-none">
+                Inventario técnico tabulado de cámaras, tramos de canalización y metrajes
               </p>
-              {/* Quick Network Breakdown: Presupuestado vs Ejecutado */}
-              <div className="flex flex-wrap items-center gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setFilterType(filterType === 'MT' ? 'all' : 'MT')}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all border ${
-                    filterType === 'MT'
-                      ? 'bg-[#1565c0] text-white border-[#1565c0] ring-2 ring-[#1565c0]/30'
-                      : 'bg-blue-50 text-[#1565c0] border-blue-200 hover:bg-blue-100'
-                  }`}
-                  title="Filtrar por Media Tensión. Clic para alternar."
-                >
-                  <span className="material-symbols-outlined text-[14px]">electrical_services</span>
-                  <span>MT: {networkSummary.mt.count} · Presup: {networkSummary.mt.presupMeters} m | Real: {networkSummary.mt.ejecMeters} m ({networkSummary.mt.pct}%)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFilterType(filterType === 'BT' ? 'all' : 'BT')}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all border ${
-                    filterType === 'BT'
-                      ? 'bg-amber-600 text-white border-amber-600 ring-2 ring-amber-600/30'
-                      : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
-                  }`}
-                  title="Filtrar por Baja Tensión. Clic para alternar."
-                >
-                  <span className="material-symbols-outlined text-[14px]">bolt</span>
-                  <span>BT: {networkSummary.bt.count} · Presup: {networkSummary.bt.presupMeters} m | Real: {networkSummary.bt.ejecMeters} m ({networkSummary.bt.pct}%)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFilterType(filterType === 'DATOS' ? 'all' : 'DATOS')}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all border ${
-                    filterType === 'DATOS'
-                      ? 'bg-teal-700 text-white border-teal-700 ring-2 ring-teal-700/30'
-                      : 'bg-teal-50 text-teal-800 border-teal-200 hover:bg-teal-100'
-                  }`}
-                  title="Filtrar por Datos / Control. Clic para alternar."
-                >
-                  <span className="material-symbols-outlined text-[14px]">settings_ethernet</span>
-                  <span>Datos: {networkSummary.datos.count} · Presup: {networkSummary.datos.presupMeters} m | Real: {networkSummary.datos.ejecMeters} m ({networkSummary.datos.pct}%)</span>
-                </button>
-                <span className="text-[11px] text-slate-700 font-bold px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200" title="Cómputo global presupuestado vs real ejecutado">
-                  Obra: Presup: {networkSummary.totalPresupMeters} m · Real: {networkSummary.totalEjecMeters} m ({networkSummary.totalPct}%)
-                </span>
-              </div>
+            </div>
+          </div>
 
-              {/* Quick Sector Breakdown */}
-              <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100">
-                <span className="text-[11px] text-[#424752] font-bold flex items-center gap-1 mr-1">
-                  <span className="material-symbols-outlined text-[13px] text-[#004d99]">share_location</span>
-                  Sectores:
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setFilterSector(filterSector === 'I1' ? 'all' : 'I1')}
-                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-bold transition-all border ${
-                    filterSector === 'I1'
-                      ? 'bg-blue-600 text-white border-blue-600 ring-2 ring-blue-600/30'
-                      : 'bg-blue-50 text-blue-800 border-blue-200 hover:bg-blue-100'
-                  }`}
-                  title="Filtrar por Intersección 1 (elementos con 'I1' en su nombre)"
-                >
-                  <span>Intersección 1: {sectorSummary.i1}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFilterSector(filterSector === 'I2' ? 'all' : 'I2')}
-                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-bold transition-all border ${
-                    filterSector === 'I2'
-                      ? 'bg-purple-600 text-white border-purple-600 ring-2 ring-purple-600/30'
-                      : 'bg-purple-50 text-purple-800 border-purple-200 hover:bg-purple-100'
-                  }`}
-                  title="Filtrar por Intersección 2 (elementos con 'I2' en su nombre)"
-                >
-                  <span>Intersección 2: {sectorSummary.i2}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFilterSector(filterSector === 'TRONCAL' ? 'all' : 'TRONCAL')}
-                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-bold transition-all border ${
-                    filterSector === 'TRONCAL'
-                      ? 'bg-amber-600 text-white border-amber-600 ring-2 ring-amber-600/30'
-                      : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
-                  }`}
-                  title="Filtrar por Troncal Principal (elementos con 'TRONCAL' en su nombre)"
-                >
-                  <span>Troncal: {sectorSummary.troncal}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFilterSector(filterSector === 'OTRO' ? 'all' : 'OTRO')}
-                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-bold transition-all border ${
-                    filterSector === 'OTRO'
-                      ? 'bg-slate-700 text-white border-slate-700 ring-2 ring-slate-700/30'
-                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
-                  title="Filtrar por Otros Sectores"
-                >
-                  <span>Otros: {sectorSummary.otro}</span>
-                </button>
-                {filterSector !== 'all' && (
-                  <button
-                    type="button"
-                    onClick={() => setFilterSector('all')}
-                    className="text-[11px] text-blue-600 underline font-medium hover:text-blue-800 ml-1"
-                  >
-                    Ver todos
-                  </button>
-                )}
-              </div>
+          {/* Mobile view mode switcher (Cards vs Compact) */}
+          <div className="flex lg:hidden items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200 shrink-0">
+            <button
+              type="button"
+              onClick={() => setMobileViewMode('cards')}
+              className={`p-1.5 rounded-lg transition-all ${
+                mobileViewMode === 'cards'
+                  ? 'bg-white text-[#004d99] shadow-xs font-bold'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+              title="Vista de Tarjetas Detalladas"
+            >
+              <span className="material-symbols-outlined text-[18px]">view_agenda</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileViewMode('compact')}
+              className={`p-1.5 rounded-lg transition-all ${
+                mobileViewMode === 'compact'
+                  ? 'bg-white text-[#004d99] shadow-xs font-bold'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+              title="Vista Compacta para Móvil"
+            >
+              <span className="material-symbols-outlined text-[18px]">table_rows</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Quick Network Breakdown: Mobile Grid (sm:hidden) */}
+        <div className="grid grid-cols-2 gap-2 sm:hidden">
+          {/* MT Card */}
+          <button
+            type="button"
+            onClick={() => setFilterType(filterType === 'MT' ? 'all' : 'MT')}
+            className={`p-2.5 rounded-xl text-left border transition-all ${
+              filterType === 'MT'
+                ? 'bg-blue-600 text-white border-blue-600 ring-2 ring-blue-600/30'
+                : 'bg-blue-50/70 text-blue-900 border-blue-200/80 active:bg-blue-100'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold flex items-center gap-1">
+                <span className="material-symbols-outlined text-[14px]">electrical_services</span>
+                MT
+              </span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono ${filterType === 'MT' ? 'bg-white/20 text-white' : 'bg-blue-200/60 text-blue-800'}`}>
+                {networkSummary.mt.count} un.
+              </span>
+            </div>
+            <div className="mt-1 text-xs font-mono font-bold leading-tight truncate">
+              {networkSummary.mt.ejecMeters}m <span className="text-[10px] font-normal opacity-80">/ {networkSummary.mt.presupMeters}m</span>
+            </div>
+            <div className="text-[10px] opacity-80 mt-0.5">
+              Avance: {networkSummary.mt.pct}%
+            </div>
+          </button>
+
+          {/* BT Card */}
+          <button
+            type="button"
+            onClick={() => setFilterType(filterType === 'BT' ? 'all' : 'BT')}
+            className={`p-2.5 rounded-xl text-left border transition-all ${
+              filterType === 'BT'
+                ? 'bg-amber-600 text-white border-amber-600 ring-2 ring-amber-600/30'
+                : 'bg-amber-50/70 text-amber-900 border-amber-200/80 active:bg-amber-100'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold flex items-center gap-1">
+                <span className="material-symbols-outlined text-[14px]">bolt</span>
+                BT
+              </span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono ${filterType === 'BT' ? 'bg-white/20 text-white' : 'bg-amber-200/60 text-amber-800'}`}>
+                {networkSummary.bt.count} un.
+              </span>
+            </div>
+            <div className="mt-1 text-xs font-mono font-bold leading-tight truncate">
+              {networkSummary.bt.ejecMeters}m <span className="text-[10px] font-normal opacity-80">/ {networkSummary.bt.presupMeters}m</span>
+            </div>
+            <div className="text-[10px] opacity-80 mt-0.5">
+              Avance: {networkSummary.bt.pct}%
+            </div>
+          </button>
+
+          {/* DATOS Card */}
+          <button
+            type="button"
+            onClick={() => setFilterType(filterType === 'DATOS' ? 'all' : 'DATOS')}
+            className={`p-2.5 rounded-xl text-left border transition-all ${
+              filterType === 'DATOS'
+                ? 'bg-teal-700 text-white border-teal-700 ring-2 ring-teal-700/30'
+                : 'bg-teal-50/70 text-teal-900 border-teal-200/80 active:bg-teal-100'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold flex items-center gap-1">
+                <span className="material-symbols-outlined text-[14px]">settings_ethernet</span>
+                Datos
+              </span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono ${filterType === 'DATOS' ? 'bg-white/20 text-white' : 'bg-teal-200/60 text-teal-800'}`}>
+                {networkSummary.datos.count} un.
+              </span>
+            </div>
+            <div className="mt-1 text-xs font-mono font-bold leading-tight truncate">
+              {networkSummary.datos.ejecMeters}m <span className="text-[10px] font-normal opacity-80">/ {networkSummary.datos.presupMeters}m</span>
+            </div>
+            <div className="text-[10px] opacity-80 mt-0.5">
+              Avance: {networkSummary.datos.pct}%
+            </div>
+          </button>
+
+          {/* TOTAL OBRA Card */}
+          <div className="p-2.5 rounded-xl text-left border bg-slate-100/80 text-slate-800 border-slate-200">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold flex items-center gap-1 text-slate-700">
+                <span className="material-symbols-outlined text-[14px]">account_tree</span>
+                Obra
+              </span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-md font-mono bg-slate-200 text-slate-700">
+                {photos.length} un.
+              </span>
+            </div>
+            <div className="mt-1 text-xs font-mono font-bold leading-tight truncate text-[#071e27]">
+              {networkSummary.totalEjecMeters}m <span className="text-[10px] font-normal text-slate-500">/ {networkSummary.totalPresupMeters}m</span>
+            </div>
+            <div className="text-[10px] text-slate-500 mt-0.5">
+              Avance: {networkSummary.totalPct}%
             </div>
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2.5 w-full lg:w-auto">
-          {/* Add New Camera */}
+        {/* Quick Network Breakdown: Desktop/Tablet Badges (hidden sm:flex) */}
+        <div className="hidden sm:flex flex-wrap items-center gap-2 pt-1">
           <button
             type="button"
-            onClick={onNavigateToUpload}
-            className="min-h-[48px] px-4 py-2.5 bg-[#004d99] hover:bg-[#1565c0] text-white font-['Inter'] font-bold text-xs sm:text-sm rounded-xl shadow-xs flex items-center justify-center gap-2 transition-all"
+            onClick={() => setFilterType(filterType === 'MT' ? 'all' : 'MT')}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all border ${
+              filterType === 'MT'
+                ? 'bg-[#1565c0] text-white border-[#1565c0] ring-2 ring-[#1565c0]/30'
+                : 'bg-blue-50 text-[#1565c0] border-blue-200 hover:bg-blue-100'
+            }`}
+            title="Filtrar por Media Tensión. Clic para alternar."
           >
-            <span className="material-symbols-outlined text-[20px]">add_circle</span>
-            <span>Nueva Cámara / Foto</span>
+            <span className="material-symbols-outlined text-[14px]">electrical_services</span>
+            <span>MT: {networkSummary.mt.count} · Presup: {networkSummary.mt.presupMeters} m | Real: {networkSummary.mt.ejecMeters} m ({networkSummary.mt.pct}%)</span>
           </button>
-
-          {/* View in Map */}
           <button
             type="button"
-            onClick={() => onNavigateToMap()}
-            className="min-h-[48px] px-3.5 py-2.5 bg-[#cfe6f2] hover:bg-[#b8d8ec] text-[#004d99] font-['Inter'] font-bold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-1.5 transition-all"
+            onClick={() => setFilterType(filterType === 'BT' ? 'all' : 'BT')}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all border ${
+              filterType === 'BT'
+                ? 'bg-amber-600 text-white border-amber-600 ring-2 ring-amber-600/30'
+                : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+            }`}
+            title="Filtrar por Baja Tensión. Clic para alternar."
           >
-            <span className="material-symbols-outlined text-[20px]">map</span>
-            <span>Ver en Plano</span>
+            <span className="material-symbols-outlined text-[14px]">bolt</span>
+            <span>BT: {networkSummary.bt.count} · Presup: {networkSummary.bt.presupMeters} m | Real: {networkSummary.bt.ejecMeters} m ({networkSummary.bt.pct}%)</span>
           </button>
+          <button
+            type="button"
+            onClick={() => setFilterType(filterType === 'DATOS' ? 'all' : 'DATOS')}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all border ${
+              filterType === 'DATOS'
+                ? 'bg-teal-700 text-white border-teal-700 ring-2 ring-teal-700/30'
+                : 'bg-teal-50 text-teal-800 border-teal-200 hover:bg-teal-100'
+            }`}
+            title="Filtrar por Datos / Control. Clic para alternar."
+          >
+            <span className="material-symbols-outlined text-[14px]">settings_ethernet</span>
+            <span>Datos: {networkSummary.datos.count} · Presup: {networkSummary.datos.presupMeters} m | Real: {networkSummary.datos.ejecMeters} m ({networkSummary.datos.pct}%)</span>
+          </button>
+          <span className="text-[11px] text-slate-700 font-bold px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200" title="Cómputo global presupuestado vs real ejecutado">
+            Obra: Presup: {networkSummary.totalPresupMeters} m · Real: {networkSummary.totalEjecMeters} m ({networkSummary.totalPct}%)
+          </span>
+        </div>
 
-          <div className="flex items-center gap-2">
-            {/* Export CSV */}
+        {/* Quick Sector Breakdown (Scrollable on mobile) */}
+        <div className="flex items-center gap-1.5 pt-2 border-t border-slate-100 overflow-x-auto no-scrollbar pb-0.5 sm:flex-wrap">
+          <span className="text-[11px] text-[#424752] font-bold flex items-center gap-1 mr-1 shrink-0">
+            <span className="material-symbols-outlined text-[13px] text-[#004d99]">share_location</span>
+            Sectores:
+          </span>
+          <button
+            type="button"
+            onClick={() => setFilterSector(filterSector === 'I1' ? 'all' : 'I1')}
+            className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all border whitespace-nowrap ${
+              filterSector === 'I1'
+                ? 'bg-blue-600 text-white border-blue-600 ring-2 ring-blue-600/30'
+                : 'bg-blue-50 text-blue-800 border-blue-200 hover:bg-blue-100'
+            }`}
+            title="Filtrar por Intersección 1"
+          >
+            <span>Intersección 1: {sectorSummary.i1}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterSector(filterSector === 'I2' ? 'all' : 'I2')}
+            className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all border whitespace-nowrap ${
+              filterSector === 'I2'
+                ? 'bg-purple-600 text-white border-purple-600 ring-2 ring-purple-600/30'
+                : 'bg-purple-50 text-purple-800 border-purple-200 hover:bg-purple-100'
+            }`}
+            title="Filtrar por Intersección 2"
+          >
+            <span>Intersección 2: {sectorSummary.i2}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterSector(filterSector === 'TRONCAL' ? 'all' : 'TRONCAL')}
+            className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all border whitespace-nowrap ${
+              filterSector === 'TRONCAL'
+                ? 'bg-amber-600 text-white border-amber-600 ring-2 ring-amber-600/30'
+                : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+            }`}
+            title="Filtrar por Troncal Principal"
+          >
+            <span>Troncal: {sectorSummary.troncal}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterSector(filterSector === 'OTRO' ? 'all' : 'OTRO')}
+            className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all border whitespace-nowrap ${
+              filterSector === 'OTRO'
+                ? 'bg-slate-700 text-white border-slate-700 ring-2 ring-slate-700/30'
+                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+            }`}
+            title="Filtrar por Otros Sectores"
+          >
+            <span>Otros: {sectorSummary.otro}</span>
+          </button>
+          {filterSector !== 'all' && (
+            <button
+              type="button"
+              onClick={() => setFilterSector('all')}
+              className="shrink-0 text-[11px] text-blue-600 underline font-medium hover:text-blue-800 ml-1 whitespace-nowrap"
+            >
+              Ver todos
+            </button>
+          )}
+        </div>
+
+        {/* Action Buttons: Mobile Optimized */}
+        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center justify-between gap-2.5 pt-2 border-t border-slate-100">
+          {/* Primary Mobile Action Buttons (Grid 2-col on mobile, flex on desktop) */}
+          <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={onNavigateToUpload}
+              className="min-h-[44px] px-3.5 py-2.5 bg-[#004d99] hover:bg-[#1565c0] text-white font-['Inter'] font-bold text-xs sm:text-sm rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
+            >
+              <span className="material-symbols-outlined text-[18px]">add_circle</span>
+              <span className="truncate">Nueva Cámara</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onNavigateToMap()}
+              className="min-h-[44px] px-3.5 py-2.5 bg-[#cfe6f2] hover:bg-[#b8d8ec] text-[#004d99] font-['Inter'] font-bold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
+            >
+              <span className="material-symbols-outlined text-[18px]">map</span>
+              <span className="truncate">Ver en Plano</span>
+            </button>
+          </div>
+
+          {/* Export & Print Tools */}
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
               type="button"
               onClick={() => handleExportCSV(false)}
-              className="flex-1 sm:flex-none min-h-[48px] px-3.5 py-2.5 bg-white hover:bg-slate-50 text-[#071e27] border border-[#c2c6d4] font-['Inter'] font-semibold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs"
+              className="flex-1 sm:flex-none min-h-[44px] px-3.5 py-2.5 bg-white hover:bg-slate-50 text-[#071e27] border border-[#c2c6d4] font-['Inter'] font-semibold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs active:scale-[0.98]"
               title="Exportar archivo CSV para Excel"
             >
-              <span className="material-symbols-outlined text-[20px] text-emerald-600">table_chart</span>
+              <span className="material-symbols-outlined text-[18px] text-emerald-600">table_chart</span>
               <span>Exportar CSV</span>
             </button>
 
-            {/* Export JSON */}
             <button
               type="button"
               onClick={handleExportJSON}
-              className="min-h-[48px] min-w-[48px] p-2.5 bg-white hover:bg-slate-50 text-[#424752] border border-[#c2c6d4] rounded-xl transition-all shadow-xs flex items-center justify-center"
+              className="min-h-[44px] min-w-[44px] p-2.5 bg-white hover:bg-slate-50 text-[#424752] border border-[#c2c6d4] rounded-xl transition-all shadow-xs flex items-center justify-center active:scale-[0.98]"
               title="Descargar copia técnica en JSON"
             >
-              <span className="material-symbols-outlined text-[22px]">data_object</span>
+              <span className="material-symbols-outlined text-[20px]">data_object</span>
             </button>
 
-            {/* Print */}
             <button
               type="button"
               onClick={handlePrint}
-              className="min-h-[48px] min-w-[48px] p-2.5 bg-white hover:bg-slate-50 text-[#424752] border border-[#c2c6d4] rounded-xl transition-all shadow-xs flex items-center justify-center"
+              className="min-h-[44px] min-w-[44px] p-2.5 bg-white hover:bg-slate-50 text-[#424752] border border-[#c2c6d4] rounded-xl transition-all shadow-xs flex items-center justify-center active:scale-[0.98]"
               title="Imprimir tabla o guardar como PDF"
             >
-              <span className="material-symbols-outlined text-[22px]">print</span>
+              <span className="material-symbols-outlined text-[20px]">print</span>
             </button>
           </div>
         </div>
       </div>
 
       {/* ----------------- SEARCH & FILTERS TOOLBAR ----------------- */}
-      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-[#c2c6d4] shadow-xs space-y-3.5">
-        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
-          {/* Universal Search Box */}
-          <div className="flex-1 relative">
-            <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-[#727783] text-[20px]">
-              search
-            </span>
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar por código de cámara, tramo, elemento, inspector o notas..."
-              className="w-full min-h-[48px] pl-10 pr-10 py-2.5 text-xs sm:text-sm bg-[#f3faff] border border-[#c2c6d4] rounded-xl outline-none focus:border-[#004d99] focus:ring-2 focus:ring-[#004d99]/20 transition-all font-['Inter'] text-[#071e27] placeholder-[#727783]"
-            />
-            {searchTerm && (
-              <button
-                type="button"
-                onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 min-w-[40px] min-h-[40px] flex items-center justify-center text-[#727783] hover:text-[#071e27]"
-              >
-                <span className="material-symbols-outlined text-[20px]">close</span>
-              </button>
-            )}
+      <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-[#c2c6d4] shadow-xs space-y-3">
+        {/* Universal Search Box */}
+        <div className="relative">
+          <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-[#727783] text-[20px]">
+            search
+          </span>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Buscar cámara, tramo, sector, acta o nota..."
+            className="w-full min-h-[44px] sm:min-h-[48px] pl-10 pr-10 py-2 text-xs sm:text-sm bg-[#f3faff] border border-[#c2c6d4] rounded-xl outline-none focus:border-[#004d99] focus:ring-2 focus:ring-[#004d99]/20 transition-all font-['Inter'] text-[#071e27] placeholder-[#727783]"
+          />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => setSearchTerm('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 min-w-[36px] min-h-[36px] flex items-center justify-center text-[#727783] hover:text-[#071e27]"
+              title="Borrar búsqueda"
+            >
+              <span className="material-symbols-outlined text-[18px]">close</span>
+            </button>
+          )}
+        </div>
+
+        {/* Quick Filter Chips (Horizontal Scroll on Mobile) */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1">
+          {/* Chip: Todos */}
+          <button
+            type="button"
+            onClick={() => {
+              setFilterStatus('all');
+              setFilterType('all');
+              setFilterElementType('all');
+            }}
+            className={`shrink-0 min-h-[34px] px-3 py-1 rounded-lg text-xs font-semibold font-['Inter'] transition-all border whitespace-nowrap ${
+              filterStatus === 'all' && filterType === 'all' && filterElementType === 'all'
+                ? 'bg-[#004d99] text-white border-[#004d99] shadow-2xs'
+                : 'bg-slate-50 text-[#424752] border-slate-200 hover:bg-slate-100'
+            }`}
+          >
+            Todos ({quickCounts.total})
+          </button>
+
+          {/* Chip: En proceso */}
+          <button
+            type="button"
+            onClick={() => setFilterStatus(filterStatus === 'En proceso' ? 'all' : 'En proceso')}
+            className={`shrink-0 min-h-[34px] px-3 py-1 rounded-lg text-xs font-semibold font-['Inter'] transition-all border whitespace-nowrap flex items-center gap-1.5 ${
+              filterStatus === 'En proceso'
+                ? 'bg-amber-600 text-white border-amber-600 shadow-2xs'
+                : 'bg-amber-50/70 text-amber-900 border-amber-200 hover:bg-amber-100'
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+            <span>En proceso ({quickCounts.enProceso})</span>
+          </button>
+
+          {/* Chip: Terminados */}
+          <button
+            type="button"
+            onClick={() => setFilterStatus(filterStatus === 'Terminado' ? 'all' : 'Terminado')}
+            className={`shrink-0 min-h-[34px] px-3 py-1 rounded-lg text-xs font-semibold font-['Inter'] transition-all border whitespace-nowrap flex items-center gap-1.5 ${
+              filterStatus === 'Terminado'
+                ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                : 'bg-emerald-50/70 text-emerald-900 border-emerald-200 hover:bg-emerald-100'
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            <span>Terminados ({quickCounts.terminado})</span>
+          </button>
+
+          {/* Chip: Cámaras */}
+          <button
+            type="button"
+            onClick={() => setFilterElementType(filterElementType === 'camara' ? 'all' : 'camara')}
+            className={`shrink-0 min-h-[34px] px-3 py-1 rounded-lg text-xs font-semibold font-['Inter'] transition-all border whitespace-nowrap ${
+              filterElementType === 'camara'
+                ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                : 'bg-indigo-50/70 text-indigo-900 border-indigo-200 hover:bg-indigo-100'
+            }`}
+          >
+            Cámaras ({quickCounts.camaras})
+          </button>
+
+          {/* Chip: Tramos */}
+          <button
+            type="button"
+            onClick={() => setFilterElementType(filterElementType === 'tuberia' ? 'all' : 'tuberia')}
+            className={`shrink-0 min-h-[34px] px-3 py-1 rounded-lg text-xs font-semibold font-['Inter'] transition-all border whitespace-nowrap ${
+              filterElementType === 'tuberia'
+                ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
+                : 'bg-purple-50/70 text-purple-900 border-purple-200 hover:bg-purple-100'
+            }`}
+          >
+            Tramos ({quickCounts.tramos})
+          </button>
+
+          {/* Chip: MT */}
+          <button
+            type="button"
+            onClick={() => setFilterType(filterType === 'MT' ? 'all' : 'MT')}
+            className={`shrink-0 min-h-[34px] px-3 py-1 rounded-lg text-xs font-semibold font-['Inter'] transition-all border whitespace-nowrap ${
+              filterType === 'MT'
+                ? 'bg-[#1565c0] text-white border-[#1565c0]'
+                : 'bg-blue-50/70 text-[#1565c0] border-blue-200 hover:bg-blue-100'
+            }`}
+          >
+            MT ({networkSummary.mt.count})
+          </button>
+
+          {/* Chip: BT */}
+          <button
+            type="button"
+            onClick={() => setFilterType(filterType === 'BT' ? 'all' : 'BT')}
+            className={`shrink-0 min-h-[34px] px-3 py-1 rounded-lg text-xs font-semibold font-['Inter'] transition-all border whitespace-nowrap ${
+              filterType === 'BT'
+                ? 'bg-amber-600 text-white border-amber-600'
+                : 'bg-amber-50/70 text-amber-900 border-amber-200 hover:bg-amber-100'
+            }`}
+          >
+            BT ({networkSummary.bt.count})
+          </button>
+
+          {/* Chip: Datos */}
+          <button
+            type="button"
+            onClick={() => setFilterType(filterType === 'DATOS' ? 'all' : 'DATOS')}
+            className={`shrink-0 min-h-[34px] px-3 py-1 rounded-lg text-xs font-semibold font-['Inter'] transition-all border whitespace-nowrap ${
+              filterType === 'DATOS'
+                ? 'bg-teal-700 text-white border-teal-700'
+                : 'bg-teal-50/70 text-teal-900 border-teal-200 hover:bg-teal-100'
+            }`}
+          >
+            Datos ({networkSummary.datos.count})
+          </button>
+        </div>
+
+        {/* Toolbar Sub-Bar: Counter & Toggle Advanced Filters */}
+        <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 text-xs">
+          <div className="text-[#424752] font-medium font-['Inter'] truncate">
+            Mostrando <span className="font-bold text-[#071e27]">{sortedPhotos.length}</span> de{' '}
+            <span className="font-bold text-[#071e27]">{photos.length}</span>
           </div>
 
-          {/* Quick Filter Selects */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:flex md:flex-wrap items-center gap-2">
-            {/* Filter: Tipo de Red */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {activeFiltersCount > 0 && (
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="px-2.5 py-1 text-xs font-bold text-[#ba1a1a] hover:bg-[#ffdad6] rounded-lg transition-all flex items-center gap-1"
+                title="Limpiar todos los filtros aplicados"
+              >
+                <span className="material-symbols-outlined text-[15px]">filter_alt_off</span>
+                <span className="hidden sm:inline">Limpiar</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowAdvancedFiltersMobile(!showAdvancedFiltersMobile)}
+              className={`md:hidden px-2.5 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1 transition-all border ${
+                showAdvancedFiltersMobile || activeFiltersCount > 0
+                  ? 'bg-[#e6f6ff] text-[#004d99] border-[#004d99]/30'
+                  : 'bg-slate-100 text-[#424752] border-slate-200'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[16px]">tune</span>
+              <span>Filtros {activeFiltersCount > 0 ? `(${activeFiltersCount})` : ''}</span>
+              <span className="material-symbols-outlined text-[14px]">
+                {showAdvancedFiltersMobile ? 'expand_less' : 'expand_more'}
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* Detailed Dropdown Filters (Collapsible on Mobile, Grid on Desktop) */}
+        <div
+          className={`${
+            showAdvancedFiltersMobile ? 'grid' : 'hidden'
+          } md:grid grid-cols-2 lg:grid-cols-6 gap-2 pt-2 border-t border-slate-100`}
+        >
+          {/* Filter: Tipo de Red */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 mb-1">Red:</label>
             <select
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
-              className="min-h-[48px] px-3 py-2.5 text-xs sm:text-sm font-['Inter'] font-semibold bg-[#f3faff] border border-[#c2c6d4] rounded-xl outline-none focus:border-[#004d99] text-[#071e27]"
+              className="w-full min-h-[42px] px-2.5 py-2 text-xs font-['Inter'] font-semibold bg-[#f3faff] border border-[#c2c6d4] rounded-xl outline-none focus:border-[#004d99] text-[#071e27]"
             >
-              <option value="all">Red: Todas</option>
+              <option value="all">Todas las Redes</option>
               <option value="MT">Media Tensión (MT)</option>
               <option value="BT">Baja Tensión (BT)</option>
               <option value="DATOS">Datos / Control</option>
             </select>
+          </div>
 
-            {/* Filter: Sector */}
+          {/* Filter: Sector */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 mb-1">Sector:</label>
             <select
               value={filterSector}
               onChange={(e) => setFilterSector(e.target.value)}
-              className="min-h-[48px] px-3 py-2.5 text-xs sm:text-sm font-['Inter'] font-semibold bg-[#f3faff] border border-[#c2c6d4] rounded-xl outline-none focus:border-[#004d99] text-[#071e27]"
+              className="w-full min-h-[42px] px-2.5 py-2 text-xs font-['Inter'] font-semibold bg-[#f3faff] border border-[#c2c6d4] rounded-xl outline-none focus:border-[#004d99] text-[#071e27]"
             >
-              <option value="all">Sector: Todos</option>
+              <option value="all">Todos los Sectores</option>
               <option value="I1">Intersección 1 (I1)</option>
               <option value="I2">Intersección 2 (I2)</option>
-              <option value="TRONCAL">Troncal Principal (TRONCAL)</option>
-              <option value="OTRO">Otros Sectores (OTRO)</option>
+              <option value="TRONCAL">Troncal Principal</option>
+              <option value="OTRO">Otros Sectores</option>
             </select>
+          </div>
 
-            {/* Filter: Estado de Ejecución */}
+          {/* Filter: Estado de Ejecución */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 mb-1">Estado:</label>
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="min-h-[48px] px-3 py-2.5 text-xs sm:text-sm font-['Inter'] font-semibold bg-[#f3faff] border border-[#c2c6d4] rounded-xl outline-none focus:border-[#004d99] text-[#071e27]"
+              className="w-full min-h-[42px] px-2.5 py-2 text-xs font-['Inter'] font-semibold bg-[#f3faff] border border-[#c2c6d4] rounded-xl outline-none focus:border-[#004d99] text-[#071e27]"
             >
-              <option value="all">Estado: Todos</option>
+              <option value="all">Todos los Estados</option>
               <option value="Terminado">Terminado</option>
               <option value="En proceso">En proceso</option>
             </select>
+          </div>
 
-            {/* Filter: Código de Cámara */}
-            {uniqueCameraCodes.length > 0 && (
-              <select
-                value={filterCameraCode}
-                onChange={(e) => setFilterCameraCode(e.target.value)}
-                className="min-h-[48px] px-3 py-2.5 text-xs sm:text-sm font-['Inter'] font-semibold bg-[#f3faff] border border-[#c2c6d4] rounded-xl outline-none focus:border-[#004d99] text-[#071e27]"
-              >
-                <option value="all">Cámara: Todas</option>
-                {uniqueCameraCodes.map((code) => (
-                  <option key={code} value={code}>
-                    {code}
-                  </option>
-                ))}
-              </select>
-            )}
+          {/* Filter: Tipo de Elemento (Cámara vs Tramo) */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 mb-1">Elemento:</label>
+            <select
+              value={filterElementType}
+              onChange={(e) => setFilterElementType(e.target.value as any)}
+              className="w-full min-h-[42px] px-2.5 py-2 text-xs font-['Inter'] font-semibold bg-[#f3faff] border border-[#c2c6d4] rounded-xl outline-none focus:border-[#004d99] text-[#071e27]"
+            >
+              <option value="all">Cámaras y Tramos</option>
+              <option value="camara">Solo Cámaras</option>
+              <option value="tuberia">Solo Tramos</option>
+            </select>
+          </div>
 
-            {/* Filter: Tramo */}
-            {uniqueTramos.length > 0 && (
-              <select
-                value={filterTramo}
-                onChange={(e) => setFilterTramo(e.target.value)}
-                className="min-h-[48px] px-3 py-2.5 text-xs sm:text-sm font-['Inter'] font-semibold bg-[#f3faff] border border-[#c2c6d4] rounded-xl outline-none focus:border-[#004d99] text-[#071e27]"
-              >
-                <option value="all">Tramo: Todos</option>
-                {uniqueTramos.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            )}
+          {/* Filter: Código de Cámara */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 mb-1">Cámara:</label>
+            <select
+              value={filterCameraCode}
+              onChange={(e) => setFilterCameraCode(e.target.value)}
+              className="w-full min-h-[42px] px-2.5 py-2 text-xs font-['Inter'] font-semibold bg-[#f3faff] border border-[#c2c6d4] rounded-xl outline-none focus:border-[#004d99] text-[#071e27]"
+            >
+              <option value="all">Todas las Cámaras</option>
+              {uniqueCameraCodes.map((code) => (
+                <option key={code} value={code}>
+                  {code}
+                </option>
+              ))}
+            </select>
+          </div>
 
-            {/* Reset Filters */}
-            {(searchTerm || filterType !== 'all' || filterSector !== 'all' || filterStatus !== 'all' || filterCameraCode !== 'all' || filterTramo !== 'all' || filterSync !== 'all') && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchTerm('');
-                  setFilterType('all');
-                  setFilterSector('all');
-                  setFilterStatus('all');
-                  setFilterCameraCode('all');
-                  setFilterTramo('all');
-                  setFilterSync('all');
-                }}
-                className="min-h-[48px] px-3.5 py-2.5 text-xs sm:text-sm font-['Inter'] font-bold text-[#ba1a1a] hover:bg-[#ffdad6] rounded-xl transition-all flex items-center justify-center gap-1.5"
-              >
-                <span className="material-symbols-outlined text-[18px]">filter_alt_off</span>
-                <span>Limpiar</span>
-              </button>
-            )}
+          {/* Filter: Tramo */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 mb-1">Tramo:</label>
+            <select
+              value={filterTramo}
+              onChange={(e) => setFilterTramo(e.target.value)}
+              className="w-full min-h-[42px] px-2.5 py-2 text-xs font-['Inter'] font-semibold bg-[#f3faff] border border-[#c2c6d4] rounded-xl outline-none focus:border-[#004d99] text-[#071e27]"
+            >
+              <option value="all">Todos los Tramos</option>
+              {uniqueTramos.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -871,8 +1232,8 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
 
       {/* ----------------- TABULATED DATA TABLE / MOBILE CARDS ----------------- */}
       <div className="bg-white rounded-2xl border border-[#c2c6d4] shadow-xs overflow-hidden">
-        {/* VISTA MÓVIL: Tarjetas táctiles fluidas (Mobile-First) */}
-        <div className="block lg:hidden p-3 sm:p-4 space-y-3">
+        {/* VISTA MÓVIL: Tarjetas fluidas o Vista Compacta (Mobile-First) */}
+        <div className="block lg:hidden p-3 sm:p-4 space-y-2.5">
           {sortedPhotos.length === 0 ? (
             <div className="py-12 text-center text-[#727783]">
               <span className="material-symbols-outlined text-[48px] text-[#c2c6d4] mb-2 block">
@@ -881,7 +1242,118 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
               <p className="font-semibold text-sm">No se encontraron registros</p>
               <p className="text-xs text-slate-500 mt-1">Prueba ajustando los filtros o el término de búsqueda</p>
             </div>
+          ) : mobileViewMode === 'compact' ? (
+            /* --- MODO COMPACTO PARA MÓVIL --- */
+            <div className="divide-y divide-slate-200 border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs">
+              {sortedPhotos.map((photo) => {
+                const isSelected = selectedIds.includes(photo.id);
+                const netInfo = getPhotoNetworkInfo(photo);
+                const elemType = getElementType(photo);
+                const isCam = elemType === 'camara';
+                const sector = getElementSector(photo.name);
+                const isTerminado = photo.executionStatus === 'Terminado';
+                const isEnProceso = photo.executionStatus === 'En proceso';
+                const linear = getPhotoRealLinearMeters(photo);
+
+                return (
+                  <div
+                    key={photo.id}
+                    className={`p-2.5 flex items-center gap-2.5 transition-all ${
+                      isSelected ? 'bg-[#e6f6ff]/60' : 'hover:bg-slate-50'
+                    }`}
+                  >
+                    {/* Checkbox */}
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => handleToggleSelect(photo.id)}
+                      className="w-5 h-5 rounded border-[#c2c6d4] text-[#004d99] focus:ring-[#004d99] cursor-pointer shrink-0"
+                    />
+
+                    {/* Compact Thumbnail */}
+                    <div
+                      onClick={() => setPreviewPhoto(photo)}
+                      className="w-11 h-11 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 shrink-0 cursor-pointer relative"
+                    >
+                      <img
+                        src={photo.imageUrl}
+                        alt={photo.name}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    </div>
+
+                    {/* Middle Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 truncate">
+                        <span className="font-bold text-xs text-[#071e27] truncate">
+                          {photo.cameraCode ? `Cám. ${photo.cameraCode}` : photo.name}
+                        </span>
+                        <span
+                          className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded shrink-0 ${
+                            netInfo.primary === 'MT'
+                              ? 'bg-blue-100 text-blue-800'
+                              : netInfo.primary === 'BT'
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-teal-100 text-teal-800'
+                          }`}
+                        >
+                          {netInfo.primary}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-[10px] text-[#727783] mt-0.5">
+                        <span className="truncate">{sector.label}</span>
+                        {!isCam && (
+                          <span className="font-bold text-teal-900 font-mono shrink-0">
+                            {linear.totalLinearMeters.toFixed(1)}m
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Status Pill (Tap to quick toggle) */}
+                    <button
+                      type="button"
+                      onClick={() => handleTogglePhotoStatus(photo)}
+                      className={`min-h-[34px] px-2 py-1 rounded-lg text-[10px] font-bold shrink-0 transition-all border flex items-center gap-1 ${
+                        isTerminado
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200 active:bg-emerald-100'
+                          : isEnProceso
+                          ? 'bg-amber-50 text-amber-800 border-amber-200 active:bg-amber-100'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 active:bg-slate-100'
+                      }`}
+                      title="Toca para cambiar estado rápidamente"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                      <span>{isTerminado ? 'Terminado' : isEnProceso ? 'En proc.' : 'Pendiente'}</span>
+                    </button>
+
+                    {/* Actions Menu */}
+                    <div className="flex items-center shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => onNavigateToMap(photo)}
+                        className="min-h-[36px] min-w-[36px] flex items-center justify-center text-[#004d99] hover:bg-[#cfe6f2] rounded-lg"
+                        title="Ver en Plano"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">map</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onSelectPhoto(photo)}
+                        className="min-h-[36px] min-w-[36px] flex items-center justify-center text-[#424752] hover:bg-slate-100 rounded-lg"
+                        title="Ver Ficha"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">visibility</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           ) : (
+            /* --- MODO TARJETAS DETALLADAS PARA MÓVIL --- */
             sortedPhotos.map((photo) => {
               const isSelected = selectedIds.includes(photo.id);
               const netInfo = getPhotoNetworkInfo(photo);
@@ -943,18 +1415,22 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
                           </div>
                         </div>
 
-                        <span
-                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold shrink-0 ${
+                        {/* Interactive Status Pill */}
+                        <button
+                          type="button"
+                          onClick={() => handleTogglePhotoStatus(photo)}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold shrink-0 transition-all border active:scale-95 ${
                             isTerminado
-                              ? 'bg-emerald-100 text-emerald-800'
+                              ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
                               : isEnProceso
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-slate-100 text-slate-700'
+                              ? 'bg-amber-100 text-amber-800 border-amber-300'
+                              : 'bg-slate-100 text-slate-700 border-slate-300'
                           }`}
+                          title="Toca para alternar estado"
                         >
                           <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                          {photo.executionStatus || 'No iniciado'}
-                        </span>
+                          <span>{photo.executionStatus || 'No iniciado'}</span>
+                        </button>
                       </div>
 
                       {/* Badges */}
@@ -1078,7 +1554,7 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
                     <button
                       type="button"
                       onClick={() => onNavigateToMap(photo)}
-                      className="min-h-[44px] px-3 py-2 bg-[#cfe6f2] hover:bg-[#b8d8ec] text-[#004d99] text-xs font-bold rounded-xl flex items-center gap-1 shadow-2xs"
+                      className="min-h-[44px] px-3 py-2 bg-[#cfe6f2] hover:bg-[#b8d8ec] text-[#004d99] text-xs font-bold rounded-xl flex items-center gap-1 shadow-2xs active:scale-95"
                     >
                       <span className="material-symbols-outlined text-[18px]">map</span>
                       <span>Plano</span>
@@ -1088,7 +1564,7 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
                       <button
                         type="button"
                         onClick={() => onSelectPhoto(photo)}
-                        className="min-h-[44px] min-w-[44px] p-2 text-[#424752] hover:bg-slate-100 rounded-xl flex items-center justify-center border border-slate-200"
+                        className="min-h-[44px] min-w-[44px] p-2 text-[#424752] hover:bg-slate-100 rounded-xl flex items-center justify-center border border-slate-200 active:scale-95"
                         title="Ver Ficha"
                       >
                         <span className="material-symbols-outlined text-[20px]">visibility</span>
@@ -1096,7 +1572,7 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
                       <button
                         type="button"
                         onClick={() => onEditPhoto(photo)}
-                        className="min-h-[44px] min-w-[44px] p-2 text-[#424752] hover:bg-slate-100 rounded-xl flex items-center justify-center border border-slate-200"
+                        className="min-h-[44px] min-w-[44px] p-2 text-[#424752] hover:bg-slate-100 rounded-xl flex items-center justify-center border border-slate-200 active:scale-95"
                         title="Editar"
                       >
                         <span className="material-symbols-outlined text-[20px]">edit</span>
@@ -1108,7 +1584,7 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
                             onDeletePhoto(photo.id);
                           }
                         }}
-                        className="min-h-[44px] min-w-[44px] p-2 text-[#ba1a1a] hover:bg-[#ffdad6] rounded-xl flex items-center justify-center border border-red-200"
+                        className="min-h-[44px] min-w-[44px] p-2 text-[#ba1a1a] hover:bg-[#ffdad6] rounded-xl flex items-center justify-center border border-red-200 active:scale-95"
                         title="Eliminar"
                       >
                         <span className="material-symbols-outlined text-[20px]">delete</span>
@@ -1120,6 +1596,58 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
             })
           )}
         </div>
+
+        {/* Floating Mobile Sticky Batch Actions Bar */}
+        {selectedIds.length > 0 && (
+          <div className="lg:hidden fixed bottom-4 inset-x-3 z-40 bg-[#071e27] text-white p-3 rounded-2xl shadow-2xl border border-slate-700 flex items-center justify-between gap-2 animate-in slide-in-from-bottom-3 duration-200">
+            <div className="flex items-center gap-2 text-xs font-bold">
+              <span className="w-5 h-5 rounded-full bg-[#004d99] text-white flex items-center justify-center text-[10px]">
+                {selectedIds.length}
+              </span>
+              <span className="hidden sm:inline">seleccionados</span>
+            </div>
+
+            <div className="flex items-center gap-1.5 overflow-x-auto">
+              <button
+                type="button"
+                onClick={() => handleBatchStatusUpdate('Terminado')}
+                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1"
+                title="Marcar seleccionados como Terminado"
+              >
+                <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                <span>Terminado</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleBatchStatusUpdate('En proceso')}
+                className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl flex items-center gap-1"
+                title="Marcar seleccionados como En proceso"
+              >
+                <span className="material-symbols-outlined text-[16px]">pending</span>
+                <span>En proceso</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleBatchDelete}
+                className="px-2.5 py-1.5 bg-red-900/80 hover:bg-red-800 text-red-200 font-bold text-xs rounded-xl flex items-center gap-1"
+                title="Eliminar seleccionados"
+              >
+                <span className="material-symbols-outlined text-[16px]">delete</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedIds([])}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg"
+                title="Cancelar selección"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* VISTA ESCRITORIO: Tabla Completa */}
         <div className="hidden lg:block overflow-x-auto">

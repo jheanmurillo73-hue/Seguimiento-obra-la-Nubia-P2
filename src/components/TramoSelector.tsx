@@ -318,7 +318,7 @@ export const TramoSelector: React.FC<TramoSelectorProps> = ({
               </p>
             </div>
 
-            {/* Checklist: Ejecutado / No Ejecutado */}
+            {/* Checklist: Ejecutado / Presupuestado */}
             <div className="flex items-center gap-1 bg-[#f3faff] p-1 rounded-xl border border-[#c2c6d4]">
               <button
                 type="button"
@@ -347,12 +347,13 @@ export const TramoSelector: React.FC<TramoSelectorProps> = ({
                 }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
                   !propIsEjecutado
-                    ? 'bg-[#ba1a1a] text-white shadow-xs'
+                    ? 'bg-[#004d99] text-white shadow-xs'
                     : 'text-[#424752] hover:bg-white/60'
                 }`}
+                title="El valor del tramo (ej. Datos) se mantiene solo con los valores de Línea Base ya definidos e inamovibles. No suma en las cantidades ejecutadas."
               >
-                <span className="material-symbols-outlined text-[15px]">cancel</span>
-                <span>No Ejecutado (0 m)</span>
+                <span className="material-symbols-outlined text-[15px]">lock</span>
+                <span>Presupuestado</span>
               </button>
             </div>
           </div>
@@ -363,7 +364,7 @@ export const TramoSelector: React.FC<TramoSelectorProps> = ({
             <div>
               <span className="font-bold">Regla de Presupuesto vs. Avance: </span>
               <span>
-                Marcar como <strong>No Ejecutado</strong> o registrar <strong>0 m ejecutados</strong> afecta únicamente el cálculo del avance real de la obra, manteniendo intactas las cantidades e importes presupuestados globales del proyecto.
+                El valor <strong>Presupuestado</strong> no suma al ejecutado y hace parte de los valores estándar definidos e inamovibles de la Línea Base (por ej. tramos de Datos). Solo los tramos marcados como <strong>Ejecutado</strong> suman a las cantidades físicas ejecutadas.
               </span>
             </div>
           </div>
@@ -453,10 +454,10 @@ export const TramoSelector: React.FC<TramoSelectorProps> = ({
                 </div>
                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
                   !propIsEjecutado
-                    ? 'bg-amber-100 text-amber-900 border-amber-300'
+                    ? 'bg-blue-100 text-blue-900 border-blue-300'
                     : 'bg-emerald-100 text-emerald-900 border-emerald-300'
                 }`}>
-                  {!propIsEjecutado ? '0 m · No Ejecutado' : 'Físico en Terreno'}
+                  {!propIsEjecutado ? '0 m · Presupuestado (Línea Base)' : 'Físico en Terreno'}
                 </span>
               </div>
 
@@ -476,10 +477,10 @@ export const TramoSelector: React.FC<TramoSelectorProps> = ({
                     }
                   }}
                   disabled={!propIsEjecutado}
-                  placeholder={!propIsEjecutado ? '0 m (No ejecutado)' : 'Ej. 0, 250, 500'}
+                  placeholder={!propIsEjecutado ? '0 m (Presupuestado · Línea Base)' : 'Ej. 0, 250, 500'}
                   className={`w-full border rounded-lg pl-3 pr-8 py-2 text-[14px] font-bold font-mono focus:outline-none ${
                     !propIsEjecutado
-                      ? 'bg-amber-50/70 border-amber-300 text-amber-900 cursor-not-allowed'
+                      ? 'bg-slate-50 border-slate-300 text-slate-700 cursor-not-allowed'
                       : 'bg-white border-[#c2c6d4] text-[#071e27] focus:border-[#1b6d24]'
                   }`}
                 />
@@ -521,10 +522,10 @@ export const TramoSelector: React.FC<TramoSelectorProps> = ({
                     if (onMetersEjecutadosChange) onMetersEjecutadosChange('0');
                     if (onIsEjecutadoChange) onIsEjecutadoChange(false);
                   }}
-                  className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300"
-                  title="Marcar como no ejecutado (0 m)"
+                  className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 hover:bg-blue-200 text-blue-900 border border-blue-300"
+                  title="Marcar como Presupuestado (0 m ejecutados)"
                 >
-                  0 m (No Ejecutado)
+                  0 m (Presupuestado)
                 </button>
               </div>
 

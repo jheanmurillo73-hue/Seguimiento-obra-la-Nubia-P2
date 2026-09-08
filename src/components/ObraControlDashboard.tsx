@@ -261,8 +261,8 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
         >
           <span className="material-symbols-outlined text-[20px]">balance</span>
           <span>Contraste Línea Base</span>
-          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-900 font-mono">
-            37 Cajas
+          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-blue-100 text-blue-900 font-mono font-bold">
+            11,614 m
           </span>
         </button>
 
@@ -287,6 +287,7 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
         <ObraBaselineContrastView
           baselineCanalizacion={baselineCanalizacion}
           baselineCamaras={baselineCamaras}
+          globalMetrics={globalMetrics}
           onNavigateToMap={() => onNavigateToMap()}
         />
       )}
@@ -468,7 +469,7 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
                     Tubería e Infraestructura Lineal ({activeSectorMetric.sectorName})
                   </h3>
                   <p className="text-xs text-[#64748b] mt-0.5">
-                    {activeSectorMetric.tramosTotal} tramos · {activeSectorMetric.metrosTotales.toFixed(1)} m lineales reales ({activeSectorMetric.distanciaTrazaTotal.toFixed(1)} m zanja)
+                    {activeSectorMetric.tramosTotal} tramos en plano · {activeSectorMetric.metrosTotales.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} m lineales reales (Línea Base) · {activeSectorMetric.distanciaTrazaTotal.toFixed(1)} m zanja
                   </p>
                 </div>
               </div>
@@ -493,29 +494,56 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
 
             {/* Indicadores en Metros Lineales Reales (Multiplicador x Distancia) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="bg-[#f0fdfa] border border-teal-200 rounded-xl p-3.5">
-                <div className="text-xs font-bold text-teal-800 uppercase">Mts Lineales Ejecutados</div>
-                <div className="text-xl sm:text-2xl font-black text-teal-900 mt-1">
-                  {activeSectorMetric.metrosEjecutados.toFixed(1)} <span className="text-sm font-normal">m</span>
+              {/* Tarjeta Izquierda: Mts Lineales Ejecutados */}
+              <div className="bg-[#f0fdfa] border border-teal-200 rounded-xl p-3.5 flex flex-col justify-between">
+                <div>
+                  <div className="text-xs font-bold text-teal-800 uppercase tracking-wide">Mts Lineales Ejecutados</div>
+                  <div className="text-xl sm:text-2xl font-black text-teal-900 mt-1">
+                    {activeSectorMetric.metrosEjecutados.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} <span className="text-sm font-normal">m</span>
+                  </div>
+                  <div className="text-xs text-teal-700 mt-1">
+                    {activeSectorMetric.metrosMtEjecutados !== undefined && activeSectorMetric.metrosBtEjecutados !== undefined
+                      ? `${activeSectorMetric.metrosMtEjecutados.toFixed(1)}m MT + ${activeSectorMetric.metrosBtEjecutados.toFixed(1)}m BT`
+                      : 'Multiplicador × Distancia × %'}
+                  </div>
                 </div>
-                <div className="text-xs text-teal-700 mt-1">Multiplicador × Distancia × %</div>
+                <div className="text-[11px] text-teal-800/80 font-medium pt-2 border-t border-teal-200/60 mt-2">
+                  Avance real instalado en campo
+                </div>
               </div>
 
-              <div className="bg-[#f8fafc] border border-slate-200 rounded-xl p-3.5">
-                <div className="text-xs font-bold text-slate-700 uppercase">Mts Lineales Presupuestados</div>
-                <div className="text-xl sm:text-2xl font-black text-slate-900 mt-1">
-                  {activeSectorMetric.metrosTotales.toFixed(1)} <span className="text-sm font-normal">m</span>
+              {/* Tarjeta Derecha: Mts Lineales Reales (Línea Base) */}
+              <div className="bg-[#f8fafc] border border-slate-200 rounded-xl p-3.5 flex flex-col justify-between">
+                <div>
+                  <div className="text-xs font-bold text-slate-700 uppercase tracking-wide">Mts Lineales Reales (Línea Base)</div>
+                  <div className="text-xl sm:text-2xl font-black text-slate-900 mt-1">
+                    {activeSectorMetric.metrosTotales.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} <span className="text-sm font-normal">m</span>
+                  </div>
+                  <div className="text-xs text-slate-600 mt-1">
+                    Pendientes: {activeSectorMetric.metrosPendientes.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} m
+                  </div>
                 </div>
-                <div className="text-xs text-slate-600 mt-1">
-                  Pendientes: {activeSectorMetric.metrosPendientes.toFixed(1)} m
+                <div className="text-[11px] text-slate-500 font-medium pt-2 border-t border-slate-200/60 mt-2">
+                  Línea base contractual de obra
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-[#64748b]">
-            <span>Área: <strong className="text-[#0f172a]">{getSectorLabel(selectedArea)}</strong></span>
-            <span>Acta: <strong className="text-[#0f172a]">{selectedActa}</strong></span>
+          <div className="mt-4 pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-[#64748b]">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-teal-500"></span>
+              <span>Instalado en Campo: <strong className="text-[#0f172a] font-bold">{activeSectorMetric.metrosEjecutados.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} m</strong></span>
+              <span className="text-slate-300">|</span>
+              <span>Línea Base: <strong className="text-[#0f172a] font-bold">{activeSectorMetric.metrosTotales.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} m</strong></span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span>Área: <strong className="text-[#0f172a]">{getSectorLabel(selectedArea)}</strong></span>
+              <span>Acta: <strong className="text-[#0f172a]">{selectedActa}</strong></span>
+              <span className="font-bold text-teal-700">
+                Relación: {activeSectorMetric.metrosAvancePonderado}%
+              </span>
+            </div>
           </div>
         </div>
       </div>

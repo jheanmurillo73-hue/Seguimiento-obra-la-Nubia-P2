@@ -359,6 +359,86 @@ export const MapView: React.FC<MapViewProps> = ({
   // Modo de coloreado del plano: 'redes' (MT/BT/Datos estándar) o 'actas' (Codificación por Acta y Facturación)
   const [mapColorMode, setMapColorMode] = useState<'redes' | 'actas'>('redes');
   const [highlightActaFilter, setHighlightActaFilter] = useState<string | null>(null);
+  const [isActasMenuCollapsed, setIsActasMenuCollapsed] = useState<boolean>(() =>
+    localStorage.getItem('photovault_actas_menu_collapsed') === 'true'
+  );
+  const [actasModalOffset, setActasModalOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const actasModalDragRef = useRef<{ startX: number; startY: number; initialOffsetX: number; initialOffsetY: number } | null>(null);
+
+  const toggleActasMenuCollapsed = (collapsed?: boolean) => {
+    setIsActasMenuCollapsed((prev) => {
+      const next = typeof collapsed === 'boolean' ? collapsed : !prev;
+      localStorage.setItem('photovault_actas_menu_collapsed', String(next));
+      return next;
+    });
+  };
+
+  const handleActasModalMouseDown = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('button')) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    actasModalDragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      initialOffsetX: actasModalOffset.x,
+      initialOffsetY: actasModalOffset.y,
+    };
+
+    const handleMouseMove = (moveEvt: MouseEvent) => {
+      if (!actasModalDragRef.current) return;
+      const dx = moveEvt.clientX - actasModalDragRef.current.startX;
+      const dy = moveEvt.clientY - actasModalDragRef.current.startY;
+      setActasModalOffset({
+        x: actasModalDragRef.current.initialOffsetX + dx,
+        y: actasModalDragRef.current.initialOffsetY + dy,
+      });
+    };
+
+    const handleMouseUp = () => {
+      actasModalDragRef.current = null;
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleActasModalTouchStart = (e: React.TouchEvent) => {
+    if ((e.target as HTMLElement).closest('button')) return;
+    const touch = e.touches[0];
+    if (!touch) return;
+    e.stopPropagation();
+
+    actasModalDragRef.current = {
+      startX: touch.clientX,
+      startY: touch.clientY,
+      initialOffsetX: actasModalOffset.x,
+      initialOffsetY: actasModalOffset.y,
+    };
+
+    const handleTouchMove = (moveEvt: TouchEvent) => {
+      if (!actasModalDragRef.current) return;
+      const currentTouch = moveEvt.touches[0];
+      if (!currentTouch) return;
+      const dx = currentTouch.clientX - actasModalDragRef.current.startX;
+      const dy = currentTouch.clientY - actasModalDragRef.current.startY;
+      setActasModalOffset({
+        x: actasModalDragRef.current.initialOffsetX + dx,
+        y: actasModalDragRef.current.initialOffsetY + dy,
+      });
+    };
+
+    const handleTouchEnd = () => {
+      actasModalDragRef.current = null;
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
+    };
+
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+    window.addEventListener('touchend', handleTouchEnd);
+  };
   const [blueprintStorageNotice, setBlueprintStorageNotice] = useState<string | null>(null);
   const [blueprintUpdateNotice, setBlueprintUpdateNotice] = useState<string | null>(null);
   const [blueprintRevision, setBlueprintRevision] = useState<BlueprintRevision | null>(null);
@@ -1562,6 +1642,7 @@ export const MapView: React.FC<MapViewProps> = ({
             onClick={() => {
               setMapColorMode('actas');
               setAreActaLabelsVisible(true);
+              setIsActasMenuCollapsed(false);
             }}
             className={`inline-flex h-7 items-center gap-1 rounded-full px-2.5 transition ${
               mapColorMode === 'actas'
@@ -2149,77 +2230,157 @@ export const MapView: React.FC<MapViewProps> = ({
               );
             })}
 
-            {/* Leyenda Flotante Interactiva de Codificación por Actas & Facturación */}
+            {/* Leyenda Flotante Modal e Interactiva de Codificación por Actas & Facturación */}
             {mapColorMode === 'actas' && (
-              <div className="absolute bottom-4 right-4 z-30 w-72 rounded-xl border border-slate-300 bg-white/95 p-3 shadow-xl backdrop-blur-sm">
-                <div className="flex items-center justify-between border-b border-slate-200 pb-2 mb-2">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
-                    <span className="material-symbols-outlined text-[16px] text-[#2563eb]">palette</span>
-                    Codificación por Actas
-                  </div>
-                  {highlightActaFilter && (
-                    <button
-                      type="button"
-                      onClick={() => setHighlightActaFilter(null)}
-                      className="text-[10px] font-bold text-blue-600 hover:underline"
-                    >
-                      Ver Todos
-                    </button>
-                  )}
+              isActasMenuCollapsed ? (
+                <div
+                  className="absolute bottom-4 right-4 z-30 select-none pointer-events-auto"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleActasMenuCollapsed(false)}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-blue-300/80 bg-white/95 px-2.5 py-1 text-xs font-bold text-slate-800 shadow-md backdrop-blur-sm transition hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700 active:scale-95"
+                    title="Expandir ventana modal de Codificación por Actas"
+                  >
+                    <span className="material-symbols-outlined text-[15px] text-[#2563eb]">palette</span>
+                    <span className="text-[11px] font-bold text-slate-700">
+                      Actas{highlightActaFilter ? `: ${highlightActaFilter}` : ''}
+                    </span>
+                    {highlightActaFilter && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
+                    )}
+                    <span className="material-symbols-outlined text-[15px] text-slate-400">expand_less</span>
+                  </button>
                 </div>
-                <div className="space-y-1 text-[11px]">
-                  {[
-                    { key: 'Acta 1', label: 'Acta 1', estado: 'Facturado', color: '#2563eb', bg: '#eff6ff', border: '#3b82f6', text: '#1d4ed8', dashed: false },
-                    { key: 'Acta 2', label: 'Acta 2', estado: 'Facturado', color: '#059669', bg: '#ecfdf5', border: '#10b981', text: '#047857', dashed: false },
-                    { key: 'Acta 3', label: 'Acta 3', estado: 'En Revisión', color: '#7c3aed', bg: '#f5f3ff', border: '#8b5cf6', text: '#6d28d9', dashed: false },
-                    { key: 'Sin Acta', label: 'Sin Acta', estado: 'Pendiente', color: '#94a3b8', bg: '#f8fafc', border: '#cbd5e1', text: '#475569', dashed: true },
-                  ].map((item) => {
-                    const isSelected = highlightActaFilter === item.key;
-                    const countInPlan = positionedPhotos.filter((p) => {
-                      const pActa = p.acta?.trim();
-                      if (item.key === 'Sin Acta') return !pActa || pActa.toLowerCase().includes('sin acta');
-                      return pActa === item.key;
-                    }).length;
+              ) : (
+                <div
+                  className="absolute bottom-4 right-4 z-30 w-60 rounded-xl border border-slate-200/90 bg-white/95 p-2 shadow-xl backdrop-blur-md transition-shadow select-none pointer-events-auto"
+                  style={{
+                    transform: `translate(${actasModalOffset.x}px, ${actasModalOffset.y}px)`,
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  onWheel={(e) => e.stopPropagation()}
+                >
+                  {/* Header de la ventana Modal (Movable & Collapsible) */}
+                  <div
+                    className="flex items-center justify-between border-b border-slate-100 pb-1.5 mb-1.5 cursor-grab active:cursor-grabbing select-none"
+                    onMouseDown={handleActasModalMouseDown}
+                    onTouchStart={handleActasModalTouchStart}
+                    title="Arrastra desde la barra para mover esta ventana modal por el plano"
+                  >
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-md bg-blue-50 text-[#2563eb] shrink-0">
+                        <span className="material-symbols-outlined text-[14px]">palette</span>
+                      </span>
+                      <span className="text-[11px] font-bold text-slate-800 truncate">
+                        Codificación por Actas
+                      </span>
+                    </div>
 
-                    return (
+                    <div className="flex items-center gap-1 shrink-0">
+                      {highlightActaFilter && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setHighlightActaFilter(null);
+                          }}
+                          className="text-[9.5px] font-bold text-blue-600 hover:text-blue-800 hover:underline px-1 py-0.5 rounded"
+                          title="Mostrar todos los elementos"
+                        >
+                          Todos
+                        </button>
+                      )}
+                      {actasModalOffset.x !== 0 || actasModalOffset.y !== 0 ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActasModalOffset({ x: 0, y: 0 });
+                          }}
+                          className="flex h-5 w-5 items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+                          title="Restablecer posición original"
+                        >
+                          <span className="material-symbols-outlined text-[13px]">restart_alt</span>
+                        </button>
+                      ) : null}
                       <button
-                        key={item.key}
                         type="button"
-                        onClick={() => setHighlightActaFilter(isSelected ? null : item.key)}
-                        className={`w-full flex items-center justify-between px-2 py-1 rounded-lg border transition text-left ${
-                          isSelected ? 'ring-2 ring-blue-500 font-bold bg-blue-50' : 'hover:bg-slate-50'
-                        }`}
-                        style={{ borderColor: item.border, backgroundColor: isSelected ? undefined : item.bg }}
-                        title={`Hacer clic para aislar elementos de ${item.label}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleActasMenuCollapsed(true);
+                        }}
+                        className="flex h-5 w-5 items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+                        title="Colapsar / Minimizar menú modal"
                       >
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <span
-                            className={`w-3 h-3 rounded-full flex items-center justify-center shrink-0 ${
-                              item.dashed ? 'border border-dashed' : ''
-                            }`}
-                            style={{ backgroundColor: item.dashed ? '#e2e8f0' : item.color, borderColor: item.color }}
-                          />
-                          <span className="font-semibold truncate" style={{ color: item.text }}>{item.label}</span>
-                          <span className="text-[8.5px] px-1 py-0.2 rounded font-sans border" style={{ color: item.text, borderColor: item.border, backgroundColor: '#ffffff' }}>
-                            {item.estado}
-                          </span>
-                        </div>
-                        <span className="text-[10px] font-mono font-bold text-slate-500 ml-1 shrink-0">
-                          {countInPlan} elem
-                        </span>
+                        <span className="material-symbols-outlined text-[16px]">expand_more</span>
                       </button>
-                    );
-                  })}
+                    </div>
+                  </div>
+
+                  {/* Contenido / Botones de Actas compactos */}
+                  <div className="space-y-1 text-[10px]">
+                    {[
+                      { key: 'Acta 1', label: 'Acta 1', estado: 'Facturado', color: '#2563eb', bg: '#eff6ff', border: '#3b82f6', text: '#1d4ed8', dashed: false },
+                      { key: 'Acta 2', label: 'Acta 2', estado: 'Facturado', color: '#059669', bg: '#ecfdf5', border: '#10b981', text: '#047857', dashed: false },
+                      { key: 'Acta 3', label: 'Acta 3', estado: 'En Revisión', color: '#7c3aed', bg: '#f5f3ff', border: '#8b5cf6', text: '#6d28d9', dashed: false },
+                      { key: 'Sin Acta', label: 'Sin Acta', estado: 'Pendiente', color: '#94a3b8', bg: '#f8fafc', border: '#cbd5e1', text: '#475569', dashed: true },
+                    ].map((item) => {
+                      const isSelected = highlightActaFilter === item.key;
+                      const countInPlan = positionedPhotos.filter((p) => {
+                        const pActa = p.acta?.trim();
+                        if (item.key === 'Sin Acta') return !pActa || pActa.toLowerCase().includes('sin acta');
+                        return pActa === item.key;
+                      }).length;
+
+                      return (
+                        <button
+                          key={item.key}
+                          type="button"
+                          onClick={() => setHighlightActaFilter(isSelected ? null : item.key)}
+                          className={`w-full flex items-center justify-between px-2 py-1 rounded-md border transition text-left ${
+                            isSelected ? 'ring-2 ring-blue-500 font-bold bg-blue-50' : 'hover:bg-slate-50'
+                          }`}
+                          style={{ borderColor: item.border, backgroundColor: isSelected ? undefined : item.bg }}
+                          title={`Hacer clic para aislar elementos de ${item.label}`}
+                        >
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span
+                              className={`w-2.5 h-2.5 rounded-full flex items-center justify-center shrink-0 ${
+                                item.dashed ? 'border border-dashed' : ''
+                              }`}
+                              style={{ backgroundColor: item.dashed ? '#e2e8f0' : item.color, borderColor: item.color }}
+                            />
+                            <span className="font-semibold truncate text-[10.5px]" style={{ color: item.text }}>{item.label}</span>
+                            <span
+                              className="text-[7.5px] px-1 py-0.2 rounded font-sans border font-medium"
+                              style={{ color: item.text, borderColor: item.border, backgroundColor: '#ffffff' }}
+                            >
+                              {item.estado}
+                            </span>
+                          </div>
+                          <span className="text-[9.5px] font-mono font-bold text-slate-500 ml-1 shrink-0">
+                            {countInPlan} elem
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Leyenda Footer compacta */}
+                  <div className="mt-1.5 pt-1 border-t border-slate-100 flex items-center justify-between text-[8.5px] text-slate-500">
+                    <span className="flex items-center gap-1">
+                      <span className="w-2.5 h-0.5 bg-[#2563eb]"></span> Sólido: Facturado
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2.5 h-0.5 border-b border-dashed border-slate-400"></span> Punteado: Pendiente
+                    </span>
+                  </div>
                 </div>
-                <div className="mt-2 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500">
-                  <span className="flex items-center gap-1">
-                    <span className="w-3 h-0.5 bg-[#2563eb]"></span> Sólido: Facturado
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-3 h-0.5 border-b border-dashed border-slate-400"></span> Punteado: Pendiente
-                  </span>
-                </div>
-              </div>
+              )
             )}
             </div>
           </div>
