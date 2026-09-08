@@ -338,7 +338,7 @@ export function calculateObraMetrics(
   // 1. Clasificación previa
   const allParsed = photos.map((p) => {
     const sectorKey = getElementSectorKey(p.name);
-    const isCamara = p.elementType === 'camara' || (!p.elementType && Boolean(p.cameraCode));
+    const isCamara = p.elementType === 'camara' || p.elementType === 'caja' || (!p.elementType && Boolean(p.cameraCode || p.cameraType));
     const isTuberia = p.elementType === 'tuberia' || (!p.elementType && Boolean(p.tramo || p.metraje));
     const isElectrical = p.elementType === 'electrico' || p.category === 'electrical';
 
@@ -529,10 +529,27 @@ export function calculateObraMetrics(
     s.btPresupuestoBaseline = baseCam ? baseCam.bt : 0;
     s.datosPresupuestoBaseline = baseCam ? baseCam.datos : 0;
 
-    s.camarasAvancePonderado = s.camarasTotal > 0 ? Math.round((camPonderado / (s.camarasTotal * 100)) * 1000) / 10 : 0;
-    s.mtAvance = s.mtTotal > 0 ? Math.round((mtPonderado / (s.mtTotal * 100)) * 1000) / 10 : 0;
-    s.btAvance = s.btTotal > 0 ? Math.round((btPonderado / (s.btTotal * 100)) * 1000) / 10 : 0;
-    s.datosAvance = s.datosTotal > 0 ? Math.round((datosPonderado / (s.datosTotal * 100)) * 1000) / 10 : 0;
+    // Presupuesto base fijo: si no se han cargado todas las cámaras como fotos individuales, se respeta el diseño presupuestado
+    if (baseCam) {
+      if (s.camarasTotal < baseCam.total) s.camarasTotal = baseCam.total;
+      if (s.mtTotal < baseCam.mt) s.mtTotal = baseCam.mt;
+      if (s.btTotal < baseCam.bt) s.btTotal = baseCam.bt;
+      if (s.datosTotal < baseCam.datos) s.datosTotal = baseCam.datos;
+
+      // Si el recuento de fotos en sistema aún no alcanza la realidad física ejecutada en campo (según actas/libro de obra):
+      const manualTotal = Math.round((baseCam.manualMT + baseCam.manualDatos + baseCam.manualBT) * 10) / 10;
+      if (s.camarasEjecutadas === 0 && manualTotal > 0) {
+        s.camarasEjecutadas = manualTotal;
+        s.mtEjecutadas = baseCam.manualMT;
+        s.btEjecutadas = baseCam.manualBT;
+        s.datosEjecutadas = baseCam.manualDatos;
+      }
+    }
+
+    s.camarasAvancePonderado = s.camarasTotal > 0 ? Math.round((s.camarasEjecutadas / s.camarasTotal) * 1000) / 10 : 0;
+    s.mtAvance = s.mtTotal > 0 ? Math.round((s.mtEjecutadas / s.mtTotal) * 1000) / 10 : 0;
+    s.btAvance = s.btTotal > 0 ? Math.round((s.btEjecutadas / s.btTotal) * 1000) / 10 : 0;
+    s.datosAvance = s.datosTotal > 0 ? Math.round((s.datosEjecutadas / s.datosTotal) * 1000) / 10 : 0;
 
     s.metrosTotales = Math.round(s.metrosTotales * 100) / 100;
     s.metrosEjecutados = Math.round(s.metrosEjecutados * 100) / 100;

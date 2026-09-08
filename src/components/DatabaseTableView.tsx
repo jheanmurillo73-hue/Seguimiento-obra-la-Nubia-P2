@@ -644,14 +644,14 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2.5 w-full lg:w-auto">
           {/* Add New Camera */}
           <button
             type="button"
             onClick={onNavigateToUpload}
-            className="px-4 py-2.5 bg-[#004d99] hover:bg-[#1565c0] text-white font-['Inter'] font-bold text-xs sm:text-sm rounded-xl shadow-xs flex items-center gap-2 transition-all"
+            className="min-h-[48px] px-4 py-2.5 bg-[#004d99] hover:bg-[#1565c0] text-white font-['Inter'] font-bold text-xs sm:text-sm rounded-xl shadow-xs flex items-center justify-center gap-2 transition-all"
           >
-            <span className="material-symbols-outlined text-[18px]">add_circle</span>
+            <span className="material-symbols-outlined text-[20px]">add_circle</span>
             <span>Nueva Cámara / Foto</span>
           </button>
 
@@ -659,47 +659,49 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
           <button
             type="button"
             onClick={() => onNavigateToMap()}
-            className="px-3.5 py-2.5 bg-[#cfe6f2] hover:bg-[#b8d8ec] text-[#004d99] font-['Inter'] font-bold text-xs sm:text-sm rounded-xl flex items-center gap-1.5 transition-all"
+            className="min-h-[48px] px-3.5 py-2.5 bg-[#cfe6f2] hover:bg-[#b8d8ec] text-[#004d99] font-['Inter'] font-bold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-1.5 transition-all"
           >
-            <span className="material-symbols-outlined text-[18px]">map</span>
+            <span className="material-symbols-outlined text-[20px]">map</span>
             <span>Ver en Plano</span>
           </button>
 
-          {/* Export CSV */}
-          <button
-            type="button"
-            onClick={() => handleExportCSV(false)}
-            className="px-3.5 py-2.5 bg-white hover:bg-slate-50 text-[#071e27] border border-[#c2c6d4] font-['Inter'] font-semibold text-xs sm:text-sm rounded-xl flex items-center gap-1.5 transition-all shadow-xs"
-            title="Exportar archivo CSV para Excel"
-          >
-            <span className="material-symbols-outlined text-[18px] text-emerald-600">table_chart</span>
-            <span>Exportar CSV</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Export CSV */}
+            <button
+              type="button"
+              onClick={() => handleExportCSV(false)}
+              className="flex-1 sm:flex-none min-h-[48px] px-3.5 py-2.5 bg-white hover:bg-slate-50 text-[#071e27] border border-[#c2c6d4] font-['Inter'] font-semibold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs"
+              title="Exportar archivo CSV para Excel"
+            >
+              <span className="material-symbols-outlined text-[20px] text-emerald-600">table_chart</span>
+              <span>Exportar CSV</span>
+            </button>
 
-          {/* Export JSON */}
-          <button
-            type="button"
-            onClick={handleExportJSON}
-            className="p-2.5 bg-white hover:bg-slate-50 text-[#424752] border border-[#c2c6d4] rounded-xl transition-all shadow-xs"
-            title="Descargar copia técnica en JSON"
-          >
-            <span className="material-symbols-outlined text-[20px]">data_object</span>
-          </button>
+            {/* Export JSON */}
+            <button
+              type="button"
+              onClick={handleExportJSON}
+              className="min-h-[48px] min-w-[48px] p-2.5 bg-white hover:bg-slate-50 text-[#424752] border border-[#c2c6d4] rounded-xl transition-all shadow-xs flex items-center justify-center"
+              title="Descargar copia técnica en JSON"
+            >
+              <span className="material-symbols-outlined text-[22px]">data_object</span>
+            </button>
 
-          {/* Print */}
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="p-2.5 bg-white hover:bg-slate-50 text-[#424752] border border-[#c2c6d4] rounded-xl transition-all shadow-xs"
-            title="Imprimir tabla o guardar como PDF"
-          >
-            <span className="material-symbols-outlined text-[20px]">print</span>
-          </button>
+            {/* Print */}
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="min-h-[48px] min-w-[48px] p-2.5 bg-white hover:bg-slate-50 text-[#424752] border border-[#c2c6d4] rounded-xl transition-all shadow-xs flex items-center justify-center"
+              title="Imprimir tabla o guardar como PDF"
+            >
+              <span className="material-symbols-outlined text-[22px]">print</span>
+            </button>
+          </div>
         </div>
       </div>
 
       {/* ----------------- SEARCH & FILTERS TOOLBAR ----------------- */}
-      <div className="bg-white p-4 rounded-2xl border border-[#c2c6d4] shadow-xs space-y-3.5">
+      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-[#c2c6d4] shadow-xs space-y-3.5">
         <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
           {/* Universal Search Box */}
           <div className="flex-1 relative">
@@ -711,26 +713,26 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Buscar por código de cámara, tramo, elemento, inspector o notas..."
-              className="w-full pl-10 pr-10 py-2.5 text-xs sm:text-sm bg-[#f3faff] border border-[#c2c6d4] rounded-xl outline-none focus:border-[#004d99] focus:ring-2 focus:ring-[#004d99]/20 transition-all font-['Inter'] text-[#071e27] placeholder-[#727783]"
+              className="w-full min-h-[48px] pl-10 pr-10 py-2.5 text-xs sm:text-sm bg-[#f3faff] border border-[#c2c6d4] rounded-xl outline-none focus:border-[#004d99] focus:ring-2 focus:ring-[#004d99]/20 transition-all font-['Inter'] text-[#071e27] placeholder-[#727783]"
             />
             {searchTerm && (
               <button
                 type="button"
                 onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#727783] hover:text-[#071e27]"
+                className="absolute right-3 top-1/2 -translate-y-1/2 min-w-[40px] min-h-[40px] flex items-center justify-center text-[#727783] hover:text-[#071e27]"
               >
-                <span className="material-symbols-outlined text-[18px]">close</span>
+                <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             )}
           </div>
 
           {/* Quick Filter Selects */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:flex md:flex-wrap items-center gap-2">
             {/* Filter: Tipo de Red */}
             <select
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
-              className="px-3 py-2.5 text-xs font-['Inter'] font-semibold bg-[#f3faff] border border-[#c2c6d4] rounded-xl outline-none focus:border-[#004d99] text-[#071e27]"
+              className="min-h-[48px] px-3 py-2.5 text-xs sm:text-sm font-['Inter'] font-semibold bg-[#f3faff] border border-[#c2c6d4] rounded-xl outline-none focus:border-[#004d99] text-[#071e27]"
             >
               <option value="all">Red: Todas</option>
               <option value="MT">Media Tensión (MT)</option>
@@ -742,7 +744,7 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
             <select
               value={filterSector}
               onChange={(e) => setFilterSector(e.target.value)}
-              className="px-3 py-2.5 text-xs font-['Inter'] font-semibold bg-[#f3faff] border border-[#c2c6d4] rounded-xl outline-none focus:border-[#004d99] text-[#071e27]"
+              className="min-h-[48px] px-3 py-2.5 text-xs sm:text-sm font-['Inter'] font-semibold bg-[#f3faff] border border-[#c2c6d4] rounded-xl outline-none focus:border-[#004d99] text-[#071e27]"
             >
               <option value="all">Sector: Todos</option>
               <option value="I1">Intersección 1 (I1)</option>
@@ -755,7 +757,7 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-3 py-2.5 text-xs font-['Inter'] font-semibold bg-[#f3faff] border border-[#c2c6d4] rounded-xl outline-none focus:border-[#004d99] text-[#071e27]"
+              className="min-h-[48px] px-3 py-2.5 text-xs sm:text-sm font-['Inter'] font-semibold bg-[#f3faff] border border-[#c2c6d4] rounded-xl outline-none focus:border-[#004d99] text-[#071e27]"
             >
               <option value="all">Estado: Todos</option>
               <option value="Terminado">Terminado</option>
@@ -767,7 +769,7 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
               <select
                 value={filterCameraCode}
                 onChange={(e) => setFilterCameraCode(e.target.value)}
-                className="px-3 py-2.5 text-xs font-['Inter'] font-semibold bg-[#f3faff] border border-[#c2c6d4] rounded-xl outline-none focus:border-[#004d99] text-[#071e27]"
+                className="min-h-[48px] px-3 py-2.5 text-xs sm:text-sm font-['Inter'] font-semibold bg-[#f3faff] border border-[#c2c6d4] rounded-xl outline-none focus:border-[#004d99] text-[#071e27]"
               >
                 <option value="all">Cámara: Todas</option>
                 {uniqueCameraCodes.map((code) => (
@@ -783,7 +785,7 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
               <select
                 value={filterTramo}
                 onChange={(e) => setFilterTramo(e.target.value)}
-                className="px-3 py-2.5 text-xs font-['Inter'] font-semibold bg-[#f3faff] border border-[#c2c6d4] rounded-xl outline-none focus:border-[#004d99] text-[#071e27]"
+                className="min-h-[48px] px-3 py-2.5 text-xs sm:text-sm font-['Inter'] font-semibold bg-[#f3faff] border border-[#c2c6d4] rounded-xl outline-none focus:border-[#004d99] text-[#071e27]"
               >
                 <option value="all">Tramo: Todos</option>
                 {uniqueTramos.map((t) => (
@@ -807,9 +809,9 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
                   setFilterTramo('all');
                   setFilterSync('all');
                 }}
-                className="px-3 py-2 text-xs font-['Inter'] font-bold text-[#ba1a1a] hover:bg-[#ffdad6] rounded-xl transition-all flex items-center gap-1"
+                className="min-h-[48px] px-3.5 py-2.5 text-xs sm:text-sm font-['Inter'] font-bold text-[#ba1a1a] hover:bg-[#ffdad6] rounded-xl transition-all flex items-center justify-center gap-1.5"
               >
-                <span className="material-symbols-outlined text-[16px]">filter_alt_off</span>
+                <span className="material-symbols-outlined text-[18px]">filter_alt_off</span>
                 <span>Limpiar</span>
               </button>
             )}
@@ -867,9 +869,260 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
         )}
       </div>
 
-      {/* ----------------- TABULATED DATA TABLE ----------------- */}
+      {/* ----------------- TABULATED DATA TABLE / MOBILE CARDS ----------------- */}
       <div className="bg-white rounded-2xl border border-[#c2c6d4] shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* VISTA MÓVIL: Tarjetas táctiles fluidas (Mobile-First) */}
+        <div className="block lg:hidden p-3 sm:p-4 space-y-3">
+          {sortedPhotos.length === 0 ? (
+            <div className="py-12 text-center text-[#727783]">
+              <span className="material-symbols-outlined text-[48px] text-[#c2c6d4] mb-2 block">
+                search_off
+              </span>
+              <p className="font-semibold text-sm">No se encontraron registros</p>
+              <p className="text-xs text-slate-500 mt-1">Prueba ajustando los filtros o el término de búsqueda</p>
+            </div>
+          ) : (
+            sortedPhotos.map((photo) => {
+              const isSelected = selectedIds.includes(photo.id);
+              const netInfo = getPhotoNetworkInfo(photo);
+              const elemType = getElementType(photo);
+              const isCam = elemType === 'camara';
+              const sector = getElementSector(photo.name);
+              const progressPct = getPhotoProgressPercentage(photo);
+              const isTerminado = photo.executionStatus === 'Terminado';
+              const isEnProceso = photo.executionStatus === 'En proceso';
+              const linear = getPhotoRealLinearMeters(photo);
+
+              return (
+                <div
+                  key={photo.id}
+                  className={`border rounded-2xl p-3.5 space-y-3 transition-all ${
+                    isSelected ? 'bg-[#e6f6ff]/40 border-[#004d99]' : 'bg-[#fcfdff] border-[#c2c6d4]'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    {/* Checkbox */}
+                    <div className="pt-0.5">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleToggleSelect(photo.id)}
+                        className="w-5 h-5 rounded border-[#c2c6d4] text-[#004d99] focus:ring-[#004d99] cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Thumbnail */}
+                    <div
+                      onClick={() => setPreviewPhoto(photo)}
+                      className="w-14 h-14 rounded-xl overflow-hidden bg-slate-100 border border-[#c2c6d4] shrink-0 cursor-pointer relative group"
+                    >
+                      <img
+                        src={photo.imageUrl}
+                        alt={photo.name}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                      <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                        <span className="material-symbols-outlined text-white text-[18px]">zoom_in</span>
+                      </div>
+                    </div>
+
+                    {/* Basic Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-1">
+                        <div>
+                          <div className="font-bold text-sm text-[#071e27] truncate">
+                            {photo.cameraCode ? (
+                              <span className="text-[#004d99]">Cámara {photo.cameraCode}</span>
+                            ) : (
+                              photo.name
+                            )}
+                          </div>
+                          <div className="text-[11px] text-[#727783] font-mono mt-0.5 truncate">
+                            {photo.displayId || photo.id.slice(0, 8)} · {photo.name}
+                          </div>
+                        </div>
+
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold shrink-0 ${
+                            isTerminado
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : isEnProceso
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-slate-100 text-slate-700'
+                          }`}
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                          {photo.executionStatus || 'No iniciado'}
+                        </span>
+                      </div>
+
+                      {/* Badges */}
+                      <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                        <span
+                          className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                            netInfo.primary === 'MT'
+                              ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                              : netInfo.primary === 'BT'
+                              ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                              : 'bg-teal-100 text-teal-800 border border-teal-200'
+                          }`}
+                        >
+                          {netInfo.primary} {isCam ? 'Cámara' : 'Tramo'}
+                        </span>
+
+                        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-semibold border border-slate-200">
+                          {sector.label}
+                        </span>
+
+                        {(photo.acta || photo.actaItem?.code) && (
+                          <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 text-[10px] font-bold border border-purple-200">
+                            {photo.acta || photo.actaItem?.code}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Progress & Metraje */}
+                  <div className="bg-white rounded-xl p-2.5 border border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-500 font-medium">Avance físico:</span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-20 bg-slate-200 h-2 rounded-full overflow-hidden">
+                          <div
+                            className={`h-2 rounded-full ${
+                              progressPct >= 100
+                                ? 'bg-emerald-500'
+                                : progressPct > 0
+                                ? 'bg-amber-500'
+                                : 'bg-slate-300'
+                            }`}
+                            style={{ width: `${progressPct}%` }}
+                          />
+                        </div>
+                        <span className="font-bold text-[#071e27] font-mono">{progressPct}%</span>
+                      </div>
+                    </div>
+
+                    {!isCam && (
+                      <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
+                        <span className="text-slate-500 font-medium">Metros Reales:</span>
+                        <span className="font-bold text-teal-900 font-mono">
+                          {linear.totalLinearMeters.toFixed(1)} m
+                          {linear.multiplier > 1 && (
+                            <span className="text-slate-500 font-normal ml-1">
+                              ({linear.multiplier}×{linear.distanceMeters.toFixed(1)}m)
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Conduits toggles on mobile if present */}
+                  {Array.isArray(photo.pipeConduits) && photo.pipeConduits.length > 0 && (
+                    <div className="space-y-1.5 pt-1">
+                      <div className="text-[11px] font-bold text-slate-600">Ductos / Tuberías:</div>
+                      <div className="space-y-1">
+                        {photo.pipeConduits.map((conduit) => {
+                          const cEjecutado = isConduitEjecutado(conduit);
+                          const cPresup = getConduitPresupuestadoMeters(conduit);
+                          const cEjec = getConduitEjecutadoMeters(conduit);
+                          return (
+                            <div
+                              key={conduit.id}
+                              className="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200 text-xs"
+                            >
+                              <div className="flex items-center gap-1.5">
+                                <span
+                                  className={`w-2 h-2 rounded-full ${
+                                    conduit.networkType === 'media_tension'
+                                      ? 'bg-indigo-600'
+                                      : conduit.networkType === 'baja_tension'
+                                      ? 'bg-amber-600'
+                                      : 'bg-teal-600'
+                                  }`}
+                                />
+                                <span className="font-bold text-slate-800">
+                                  {conduit.networkType === 'media_tension'
+                                    ? 'MT'
+                                    : conduit.networkType === 'baja_tension'
+                                    ? 'BT'
+                                    : 'DATOS'}
+                                </span>
+                                <span className="text-slate-500 font-mono text-[11px]">
+                                  {cEjec.toFixed(1)} / {cPresup.toFixed(1)} m
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleConduitEjecutado(photo, conduit.id)}
+                                className={`min-h-[38px] px-2.5 py-1 rounded-lg text-xs font-bold transition-all border ${
+                                  cEjecutado
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                                    : 'bg-slate-100 text-slate-600 border-slate-300'
+                                }`}
+                              >
+                                {cEjecutado ? '✓ Ejecutado' : 'Pendiente'}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Actions Bar */}
+                  <div className="flex items-center justify-between pt-1 gap-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => onNavigateToMap(photo)}
+                      className="min-h-[44px] px-3 py-2 bg-[#cfe6f2] hover:bg-[#b8d8ec] text-[#004d99] text-xs font-bold rounded-xl flex items-center gap-1 shadow-2xs"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">map</span>
+                      <span>Plano</span>
+                    </button>
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => onSelectPhoto(photo)}
+                        className="min-h-[44px] min-w-[44px] p-2 text-[#424752] hover:bg-slate-100 rounded-xl flex items-center justify-center border border-slate-200"
+                        title="Ver Ficha"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">visibility</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onEditPhoto(photo)}
+                        className="min-h-[44px] min-w-[44px] p-2 text-[#424752] hover:bg-slate-100 rounded-xl flex items-center justify-center border border-slate-200"
+                        title="Editar"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">edit</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm(`¿Eliminar la inspección "${photo.name}"?`)) {
+                            onDeletePhoto(photo.id);
+                          }
+                        }}
+                        className="min-h-[44px] min-w-[44px] p-2 text-[#ba1a1a] hover:bg-[#ffdad6] rounded-xl flex items-center justify-center border border-red-200"
+                        title="Eliminar"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">delete</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* VISTA ESCRITORIO: Tabla Completa */}
+        <div className="hidden lg:block overflow-x-auto">
           <table className="w-full text-left border-collapse font-['Inter'] text-xs sm:text-sm">
             <thead>
               <tr className="bg-[#f3faff] border-b border-[#c2c6d4] text-[#424752] font-semibold select-none">

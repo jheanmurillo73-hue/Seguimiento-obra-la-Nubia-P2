@@ -93,17 +93,17 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-6">
+    <div className="w-full max-w-7xl mx-auto space-y-4 sm:space-y-6">
       {/* 1. Header Ejecutivo & Sincronización */}
-      <div className="bg-white border border-[#c2c6d4] rounded-2xl p-5 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="bg-white border border-[#c2c6d4] rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center justify-center p-2 rounded-xl bg-[#004d99]/10 text-[#004d99]">
-              <span className="material-symbols-outlined text-[24px]">query_stats</span>
+          <div className="flex items-start sm:items-center gap-3">
+            <span className="inline-flex items-center justify-center p-2.5 rounded-xl bg-[#004d99]/10 text-[#004d99] shrink-0">
+              <span className="material-symbols-outlined text-[26px]">query_stats</span>
             </span>
             <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-[#071e27] tracking-tight flex items-center gap-2">
-                Control de Avance Físico de Obra
+              <h1 className="text-lg sm:text-2xl font-bold text-[#071e27] tracking-tight flex flex-wrap items-center gap-2">
+                <span>Control de Avance Físico de Obra</span>
                 <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
                   Power BI Style
                 </span>
@@ -115,34 +115,34 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 w-full md:w-auto justify-end">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
           {onOpenSupabaseModal && (
             <button
               type="button"
               onClick={onOpenSupabaseModal}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-[#c2c6d4] bg-[#f8fbff] text-xs font-bold text-[#004d99] hover:bg-[#e6f4ff] transition-all shadow-2xs"
+              className="inline-flex items-center justify-center gap-2 px-4 py-3 min-h-[48px] rounded-xl border border-[#c2c6d4] bg-[#f8fbff] text-xs sm:text-sm font-bold text-[#004d99] hover:bg-[#e6f4ff] transition-all shadow-2xs"
             >
-              <span className="material-symbols-outlined text-[18px]">database</span>
-              Vistas SQL Supabase
+              <span className="material-symbols-outlined text-[20px]">database</span>
+              <span>Vistas SQL Supabase</span>
             </button>
           )}
           <button
             type="button"
             onClick={() => onNavigateToMap()}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#004d99] text-white text-xs font-bold hover:bg-[#003d7a] transition-all shadow-xs"
+            className="inline-flex items-center justify-center gap-2 px-4 py-3 min-h-[48px] rounded-xl bg-[#004d99] text-white text-xs sm:text-sm font-bold hover:bg-[#003d7a] transition-all shadow-xs"
           >
-            <span className="material-symbols-outlined text-[18px]">map</span>
-            Ver en Plano
+            <span className="material-symbols-outlined text-[20px]">map</span>
+            <span>Ver en Plano</span>
           </button>
         </div>
       </div>
 
       {/* 2. Barra Superior de Filtros Globales (Power BI Slicers Bar) */}
-      <div className="bg-white border border-[#c2c6d4] rounded-2xl p-4 shadow-xs space-y-3">
+      <div className="bg-white border border-[#c2c6d4] rounded-2xl p-4 sm:p-5 shadow-xs space-y-3.5">
         <div className="flex items-center justify-between border-b border-[#e2e8f0] pb-2">
           <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#475569]">
-            <span className="material-symbols-outlined text-[16px] text-[#004d99]">filter_alt</span>
-            Segmentadores Globales (Filtros Activos)
+            <span className="material-symbols-outlined text-[18px] text-[#004d99]">filter_alt</span>
+            <span>Segmentadores Globales (Filtros Activos)</span>
           </div>
           {(selectedArea !== 'TODOS' || selectedActa !== 'TODAS' || soloPendientes) && (
             <button
@@ -152,19 +152,19 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
                 setSelectedActa('TODAS');
                 setSoloPendientes(false);
               }}
-              className="text-xs text-[#004d99] hover:underline font-semibold flex items-center gap-1"
+              className="text-xs min-h-[44px] px-2 text-[#004d99] hover:underline font-semibold flex items-center gap-1"
             >
-              <span className="material-symbols-outlined text-[14px]">restart_alt</span>
+              <span className="material-symbols-outlined text-[16px]">restart_alt</span>
               Limpiar Filtros
             </button>
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5 items-center">
           {/* Slicer 1: Área / Sector */}
-          <div className="md:col-span-5 flex flex-col gap-1">
-            <span className="text-[11px] font-semibold text-[#64748b]">Área / Sector</span>
-            <div className="flex flex-wrap gap-1 p-1 bg-[#f1f5f9] rounded-xl border border-[#cbd5e1]">
+          <div className="md:col-span-5 flex flex-col gap-1.5">
+            <span className="text-xs font-semibold text-[#64748b]">Área / Sector</span>
+            <div className="grid grid-cols-5 gap-1 p-1 bg-[#f1f5f9] rounded-xl border border-[#cbd5e1] sm:flex sm:flex-wrap">
               {(['TODOS', 'I1', 'I2', 'TRONCAL', 'OTRO'] as const).map((areaKey) => {
                 const isSelected = selectedArea === areaKey;
                 return (
@@ -172,7 +172,7 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
                     key={areaKey}
                     type="button"
                     onClick={() => setSelectedArea(areaKey)}
-                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    className={`min-h-[44px] sm:min-h-[38px] px-2 sm:px-3 py-2 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center ${
                       isSelected
                         ? 'bg-[#004d99] text-white shadow-xs'
                         : 'text-[#334155] hover:bg-white hover:text-[#004d99]'
@@ -181,9 +181,9 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
                     {areaKey === 'TODOS'
                       ? 'Todas'
                       : areaKey === 'I1'
-                      ? 'Int 1 (I1)'
+                      ? 'Int 1'
                       : areaKey === 'I2'
-                      ? 'Int 2 (I2)'
+                      ? 'Int 2'
                       : areaKey === 'TRONCAL'
                       ? 'Troncal'
                       : 'Otros'}
@@ -194,12 +194,12 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
           </div>
 
           {/* Slicer 2: Número de Acta */}
-          <div className="md:col-span-4 flex flex-col gap-1">
-            <span className="text-[11px] font-semibold text-[#64748b]">Auditoría por Acta</span>
+          <div className="md:col-span-4 flex flex-col gap-1.5">
+            <span className="text-xs font-semibold text-[#64748b]">Auditoría por Acta</span>
             <select
               value={selectedActa}
               onChange={(e) => setSelectedActa(e.target.value)}
-              className="w-full bg-[#f8fafc] border border-[#cbd5e1] rounded-xl px-3 py-1.5 text-xs font-semibold text-[#1e293b] focus:outline-none focus:ring-2 focus:ring-[#004d99]"
+              className="w-full min-h-[48px] bg-[#f8fafc] border border-[#cbd5e1] rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-[#1e293b] focus:outline-none focus:ring-2 focus:ring-[#004d99]"
             >
               {globalMetrics.actasDisponibles.map((actaName) => (
                 <option key={actaName} value={actaName}>
@@ -210,24 +210,24 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
           </div>
 
           {/* Slicer 3: Toggle Mostrar solo Pendientes */}
-          <div className="md:col-span-3 flex flex-col gap-1 justify-center">
-            <span className="text-[11px] font-semibold text-[#64748b]">Estado Crítico</span>
+          <div className="md:col-span-3 flex flex-col gap-1.5 justify-center">
+            <span className="text-xs font-semibold text-[#64748b]">Estado Crítico</span>
             <button
               type="button"
               onClick={() => setSoloPendientes(!soloPendientes)}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all border ${
+              className={`w-full min-h-[48px] flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all border ${
                 soloPendientes
                   ? 'bg-amber-50 text-amber-900 border-amber-300 ring-1 ring-amber-400'
                   : 'bg-[#f8fafc] text-[#475569] border-[#cbd5e1] hover:bg-slate-100'
               }`}
             >
-              <span className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[16px] text-amber-600">
+              <span className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[20px] text-amber-600">
                   {soloPendientes ? 'check_box' : 'check_box_outline_blank'}
                 </span>
                 Solo Pendientes
               </span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white font-mono border">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-white font-mono border font-bold">
                 {globalMetrics.totalPendientes}
               </span>
             </button>
@@ -236,31 +236,31 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
       </div>
 
       {/* 2.5 Barra de Pestañas Principales del Dashboard */}
-      <div className="flex items-center gap-2 border-b border-[#cbd5e1] pb-1 overflow-x-auto">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 border-b border-[#cbd5e1] pb-2">
         <button
           type="button"
           onClick={() => setDashboardTab('RESUMEN')}
-          className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
+          className={`min-h-[48px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all text-center ${
             dashboardTab === 'RESUMEN'
               ? 'bg-[#004d99] text-white shadow-xs'
               : 'bg-white text-[#475569] border border-[#cbd5e1] hover:bg-slate-50'
           }`}
         >
-          <span className="material-symbols-outlined text-[18px]">analytics</span>
-          Resumen General & Gráficos
+          <span className="material-symbols-outlined text-[20px]">analytics</span>
+          <span>Resumen General</span>
         </button>
 
         <button
           type="button"
           onClick={() => setDashboardTab('CONTRASTE')}
-          className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
+          className={`min-h-[48px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all text-center ${
             dashboardTab === 'CONTRASTE'
               ? 'bg-[#004d99] text-white shadow-xs'
               : 'bg-white text-[#475569] border border-[#cbd5e1] hover:bg-slate-50'
           }`}
         >
-          <span className="material-symbols-outlined text-[18px]">balance</span>
-          Contraste Línea Base (Cuentas Manuales vs. Sistema)
+          <span className="material-symbols-outlined text-[20px]">balance</span>
+          <span>Contraste Línea Base</span>
           <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-900 font-mono">
             37 Cajas
           </span>
@@ -269,14 +269,14 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
         <button
           type="button"
           onClick={() => setDashboardTab('ACTAS')}
-          className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
+          className={`min-h-[48px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all text-center ${
             dashboardTab === 'ACTAS'
               ? 'bg-[#004d99] text-white shadow-xs'
               : 'bg-white text-[#475569] border border-[#cbd5e1] hover:bg-slate-50'
           }`}
         >
-          <span className="material-symbols-outlined text-[18px]">receipt_long</span>
-          Resumen Consolidado por Actas (v_resumen_redes)
+          <span className="material-symbols-outlined text-[20px]">receipt_long</span>
+          <span>Consolidado Actas</span>
           <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-blue-100 text-blue-900 font-mono">
             {resumenRedesActas.length} filas
           </span>
@@ -304,18 +304,18 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
       {/* 3. Sección KPI Header Cards (Al estilo Power BI) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* KPI 1: Tarjeta Principal Cámaras (Dinamizada por Filtro) */}
-        <div className="lg:col-span-7 bg-white border border-[#c2c6d4] rounded-2xl p-5 shadow-xs flex flex-col justify-between">
+        <div className="lg:col-span-7 bg-white border border-[#c2c6d4] rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between border-b border-[#f1f5f9] pb-3 mb-3">
-              <div className="flex items-center gap-2">
-                <span className="p-2 rounded-xl bg-blue-50 text-blue-700">
-                  <span className="material-symbols-outlined text-[20px]">videocam</span>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#f1f5f9] pb-3 mb-3">
+              <div className="flex items-start sm:items-center gap-2.5">
+                <span className="p-2 rounded-xl bg-blue-50 text-blue-700 shrink-0">
+                  <span className="material-symbols-outlined text-[22px]">videocam</span>
                 </span>
                 <div>
-                  <h3 className="text-sm font-bold text-[#0f172a] uppercase tracking-wide">
+                  <h3 className="text-sm sm:text-base font-bold text-[#0f172a] uppercase tracking-wide">
                     Resumen de Cámaras ({activeSectorMetric.sectorName})
                   </h3>
-                  <p className="text-[11px] text-[#64748b]">
+                  <p className="text-xs text-[#64748b] mt-0.5">
                     <strong className="text-[#0f172a] font-bold">{activeSectorMetric.camarasEjecutadas.toFixed(1)} un ejecutadas</strong> de <strong className="text-[#0f172a] font-bold">{activeSectorMetric.camarasTotal} un presupuestadas</strong>
                     {activeSectorMetric.camarasPresupuestoBaseline > 0 && activeSectorMetric.camarasPresupuestoBaseline !== activeSectorMetric.camarasTotal && (
                       <span className="text-slate-500 font-normal"> (Línea Base: {activeSectorMetric.camarasPresupuestoBaseline} un)</span>
@@ -325,117 +325,120 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
                   </p>
                 </div>
               </div>
-              <div className="text-right">
-                <span className="text-2xl font-black text-[#004d99]">
-                  {activeSectorMetric.camarasAvancePonderado}%
-                </span>
-                <div className="text-[10px] font-bold text-[#64748b] uppercase">Relación Ejecutado / Presupuesto</div>
+              <div className="flex items-center justify-between sm:justify-end sm:text-right pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                <div className="sm:hidden text-xs font-bold text-[#64748b] uppercase">Avance Ejecución:</div>
+                <div>
+                  <span className="text-2xl sm:text-3xl font-black text-[#004d99]">
+                    {activeSectorMetric.camarasAvancePonderado}%
+                  </span>
+                  <div className="hidden sm:block text-[10px] font-bold text-[#64748b] uppercase">Relación Ejecutado / Presupuesto</div>
+                </div>
               </div>
             </div>
 
             {/* Barra de progreso global de cámaras */}
-            <div className="w-full bg-[#f1f5f9] rounded-full h-2.5 mb-4 overflow-hidden">
+            <div className="w-full bg-[#f1f5f9] rounded-full h-3 mb-4 overflow-hidden">
               <div
-                className={`h-2.5 rounded-full transition-all duration-500 ${getProgressColor(activeSectorMetric.camarasAvancePonderado)}`}
+                className={`h-3 rounded-full transition-all duration-500 ${getProgressColor(activeSectorMetric.camarasAvancePonderado)}`}
                 style={{ width: `${Math.min(100, activeSectorMetric.camarasAvancePonderado)}%` }}
               />
             </div>
 
             {/* 3 Mini Bloques Compactos (MT, BT, DATOS) mostrando Cantidades Ejecutadas vs Presupuestadas */}
-            <div className="grid grid-cols-3 gap-3 pt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
               {/* Media Tensión */}
-              <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-xl p-3 flex flex-col justify-between">
+              <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-xl p-3.5 flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-indigo-700 flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
-                      MT
+                    <span className="text-xs font-bold text-indigo-700 flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
+                      Media Tensión (MT)
                     </span>
-                    <span className="text-xs font-black text-indigo-800">{activeSectorMetric.mtAvance}%</span>
+                    <span className="text-xs font-black px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">{activeSectorMetric.mtAvance}%</span>
                   </div>
-                  <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mt-1">
+                  <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider mt-1.5">
                     Ejecutado / Presupuesto
                   </div>
-                  <div className="mt-0.5">
-                    <div className="text-base sm:text-lg font-black text-[#0f172a] flex items-baseline gap-1">
+                  <div className="mt-1">
+                    <div className="text-lg sm:text-xl font-black text-[#0f172a] flex items-baseline gap-1.5">
                       <span>{activeSectorMetric.mtEjecutadas.toFixed(1)}</span>
                       <span className="text-xs font-semibold text-[#64748b]"> / {activeSectorMetric.mtTotal} un</span>
                     </div>
-                    <div className="w-full bg-slate-200 h-1.5 rounded-full mt-1.5 overflow-hidden">
-                      <div className="bg-indigo-600 h-1.5 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, activeSectorMetric.mtAvance)}%` }} />
+                    <div className="w-full bg-slate-200 h-2 rounded-full mt-2 overflow-hidden">
+                      <div className="bg-indigo-600 h-2 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, activeSectorMetric.mtAvance)}%` }} />
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center justify-between text-[10px] text-slate-500 pt-2 border-t border-slate-200/60 mt-2">
+                <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-200/60 mt-2.5">
                   <span>{activeSectorMetric.mtIntervenidas} en campo</span>
-                  <span className="font-medium text-slate-600">Base: {activeSectorMetric.mtPresupuestoBaseline || activeSectorMetric.mtTotal}</span>
+                  <span className="font-medium text-slate-600">Base: {activeSectorMetric.mtPresupuestoBaseline || activeSectorMetric.mtTotal} un</span>
                 </div>
               </div>
 
               {/* Baja Tensión */}
-              <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-xl p-3 flex flex-col justify-between">
+              <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-xl p-3.5 flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-amber-700 flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-amber-600"></span>
-                      BT
+                    <span className="text-xs font-bold text-amber-700 flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-600"></span>
+                      Baja Tensión (BT)
                     </span>
-                    <span className="text-xs font-black text-amber-800">{activeSectorMetric.btAvance}%</span>
+                    <span className="text-xs font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">{activeSectorMetric.btAvance}%</span>
                   </div>
-                  <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mt-1">
+                  <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider mt-1.5">
                     Ejecutado / Presupuesto
                   </div>
-                  <div className="mt-0.5">
-                    <div className="text-base sm:text-lg font-black text-[#0f172a] flex items-baseline gap-1">
+                  <div className="mt-1">
+                    <div className="text-lg sm:text-xl font-black text-[#0f172a] flex items-baseline gap-1.5">
                       <span>{activeSectorMetric.btEjecutadas.toFixed(1)}</span>
                       <span className="text-xs font-semibold text-[#64748b]"> / {activeSectorMetric.btTotal} un</span>
                     </div>
-                    <div className="w-full bg-slate-200 h-1.5 rounded-full mt-1.5 overflow-hidden">
-                      <div className="bg-amber-600 h-1.5 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, activeSectorMetric.btAvance)}%` }} />
+                    <div className="w-full bg-slate-200 h-2 rounded-full mt-2 overflow-hidden">
+                      <div className="bg-amber-600 h-2 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, activeSectorMetric.btAvance)}%` }} />
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center justify-between text-[10px] text-slate-500 pt-2 border-t border-slate-200/60 mt-2">
+                <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-200/60 mt-2.5">
                   <span>{activeSectorMetric.btIntervenidas} en campo</span>
-                  <span className="font-medium text-slate-600">Base: {activeSectorMetric.btPresupuestoBaseline || activeSectorMetric.btTotal}</span>
+                  <span className="font-medium text-slate-600">Base: {activeSectorMetric.btPresupuestoBaseline || activeSectorMetric.btTotal} un</span>
                 </div>
               </div>
 
               {/* Datos */}
-              <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-xl p-3 flex flex-col justify-between">
+              <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-xl p-3.5 flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-teal-700 flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-teal-600"></span>
-                      DATOS
+                    <span className="text-xs font-bold text-teal-700 flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-teal-600"></span>
+                      DATOS / Control
                     </span>
-                    <span className="text-xs font-black text-teal-800">{activeSectorMetric.datosAvance}%</span>
+                    <span className="text-xs font-black px-2 py-0.5 rounded-full bg-teal-100 text-teal-800">{activeSectorMetric.datosAvance}%</span>
                   </div>
-                  <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mt-1">
+                  <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider mt-1.5">
                     Ejecutado / Presupuesto
                   </div>
-                  <div className="mt-0.5">
-                    <div className="text-base sm:text-lg font-black text-[#0f172a] flex items-baseline gap-1">
+                  <div className="mt-1">
+                    <div className="text-lg sm:text-xl font-black text-[#0f172a] flex items-baseline gap-1.5">
                       <span>{activeSectorMetric.datosEjecutadas.toFixed(1)}</span>
                       <span className="text-xs font-semibold text-[#64748b]"> / {activeSectorMetric.datosTotal} un</span>
                     </div>
-                    <div className="w-full bg-slate-200 h-1.5 rounded-full mt-1.5 overflow-hidden">
-                      <div className="bg-teal-600 h-1.5 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, activeSectorMetric.datosAvance)}%` }} />
+                    <div className="w-full bg-slate-200 h-2 rounded-full mt-2 overflow-hidden">
+                      <div className="bg-teal-600 h-2 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, activeSectorMetric.datosAvance)}%` }} />
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center justify-between text-[10px] text-slate-500 pt-2 border-t border-slate-200/60 mt-2">
+                <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-200/60 mt-2.5">
                   <span>{activeSectorMetric.datosIntervenidas} en campo</span>
-                  <span className="font-medium text-slate-600">Base: {activeSectorMetric.datosPresupuestoBaseline || activeSectorMetric.datosTotal}</span>
+                  <span className="font-medium text-slate-600">Base: {activeSectorMetric.datosPresupuestoBaseline || activeSectorMetric.datosTotal} un</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Barra de pie de tarjeta con relación y contraste oficial */}
-          <div className="mt-3 pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#64748b]">
-            <div className="flex items-center gap-2">
-              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+          <div className="mt-4 pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-[#64748b]">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
               <span>Ejecución Física Real: <strong className="text-[#0f172a] font-bold">{activeSectorMetric.camarasEjecutadas.toFixed(1)} un</strong></span>
               <span className="text-slate-300">|</span>
               <span>Presupuesto Modelo: <strong className="text-[#0f172a] font-bold">{activeSectorMetric.camarasTotal} un</strong></span>
@@ -453,54 +456,57 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
         </div>
 
         {/* KPI 2: Tarjeta Tramos de Tubería (Metros Lineales Reales) */}
-        <div className="lg:col-span-5 bg-white border border-[#c2c6d4] rounded-2xl p-5 shadow-xs flex flex-col justify-between">
+        <div className="lg:col-span-5 bg-white border border-[#c2c6d4] rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between border-b border-[#f1f5f9] pb-3 mb-3">
-              <div className="flex items-center gap-2">
-                <span className="p-2 rounded-xl bg-teal-50 text-teal-700">
-                  <span className="material-symbols-outlined text-[20px]">linear_scale</span>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#f1f5f9] pb-3 mb-3">
+              <div className="flex items-start sm:items-center gap-2.5">
+                <span className="p-2 rounded-xl bg-teal-50 text-teal-700 shrink-0">
+                  <span className="material-symbols-outlined text-[22px]">linear_scale</span>
                 </span>
                 <div>
-                  <h3 className="text-sm font-bold text-[#0f172a] uppercase tracking-wide">
+                  <h3 className="text-sm sm:text-base font-bold text-[#0f172a] uppercase tracking-wide">
                     Tubería e Infraestructura Lineal ({activeSectorMetric.sectorName})
                   </h3>
-                  <p className="text-[11px] text-[#64748b]">
+                  <p className="text-xs text-[#64748b] mt-0.5">
                     {activeSectorMetric.tramosTotal} tramos · {activeSectorMetric.metrosTotales.toFixed(1)} m lineales reales ({activeSectorMetric.distanciaTrazaTotal.toFixed(1)} m zanja)
                   </p>
                 </div>
               </div>
-              <div className="text-right">
-                <span className="text-2xl font-black text-teal-700">
-                  {activeSectorMetric.metrosAvancePonderado}%
-                </span>
-                <div className="text-[10px] font-bold text-[#64748b] uppercase">Instalado</div>
+              <div className="flex items-center justify-between sm:justify-end sm:text-right pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                <div className="sm:hidden text-xs font-bold text-[#64748b] uppercase">Avance Tubería:</div>
+                <div>
+                  <span className="text-2xl sm:text-3xl font-black text-teal-700">
+                    {activeSectorMetric.metrosAvancePonderado}%
+                  </span>
+                  <div className="hidden sm:block text-[10px] font-bold text-[#64748b] uppercase">Instalado</div>
+                </div>
               </div>
             </div>
 
             {/* Barra de progreso de tubería */}
-            <div className="w-full bg-[#f1f5f9] rounded-full h-2.5 mb-4 overflow-hidden">
+            <div className="w-full bg-[#f1f5f9] rounded-full h-3 mb-4 overflow-hidden">
               <div
-                className="h-2.5 rounded-full bg-teal-600 transition-all duration-500"
+                className="h-3 rounded-full bg-teal-600 transition-all duration-500"
                 style={{ width: `${Math.min(100, activeSectorMetric.metrosAvancePonderado)}%` }}
               />
             </div>
 
             {/* Indicadores en Metros Lineales Reales (Multiplicador x Distancia) */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-[#f0fdfa] border border-teal-200 rounded-xl p-3">
-                <div className="text-[11px] font-bold text-teal-800 uppercase">Mts Lineales Ejecutados</div>
-                <div className="text-xl font-black text-teal-900 mt-0.5">
-                  {activeSectorMetric.metrosEjecutados.toFixed(1)} <span className="text-xs font-normal">m</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="bg-[#f0fdfa] border border-teal-200 rounded-xl p-3.5">
+                <div className="text-xs font-bold text-teal-800 uppercase">Mts Lineales Ejecutados</div>
+                <div className="text-xl sm:text-2xl font-black text-teal-900 mt-1">
+                  {activeSectorMetric.metrosEjecutados.toFixed(1)} <span className="text-sm font-normal">m</span>
                 </div>
-                <div className="text-[10px] text-teal-700 mt-1">Multiplicador × Distancia × %</div>
+                <div className="text-xs text-teal-700 mt-1">Multiplicador × Distancia × %</div>
               </div>
 
-              <div className="bg-[#f8fafc] border border-slate-200 rounded-xl p-3">
-                <div className="text-[11px] font-bold text-slate-700 uppercase">Mts Lineales Reales</div>
-                <div className="text-xl font-black text-slate-900 mt-0.5">
-                  {activeSectorMetric.metrosTotales.toFixed(1)} <span className="text-xs font-normal">m</span>
+              <div className="bg-[#f8fafc] border border-slate-200 rounded-xl p-3.5">
+                <div className="text-xs font-bold text-slate-700 uppercase">Mts Lineales Presupuestados</div>
+                <div className="text-xl sm:text-2xl font-black text-slate-900 mt-1">
+                  {activeSectorMetric.metrosTotales.toFixed(1)} <span className="text-sm font-normal">m</span>
                 </div>
-                <div className="text-[10px] text-slate-600 mt-1">
+                <div className="text-xs text-slate-600 mt-1">
                   Pendientes: {activeSectorMetric.metrosPendientes.toFixed(1)} m
                 </div>
               </div>
@@ -643,26 +649,26 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
       </div>
 
       {/* 5. Tabla de Detalle y Auditoría de Pendientes (Expandible y Filtrable) */}
-      <div className="bg-white border border-[#c2c6d4] rounded-2xl p-5 shadow-xs space-y-4">
+      <div className="bg-white border border-[#c2c6d4] rounded-2xl p-4 sm:p-5 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#e2e8f0] pb-4">
           <div>
-            <h3 className="text-sm font-bold text-[#0f172a] uppercase tracking-wide flex items-center gap-2">
-              <span className="material-symbols-outlined text-[18px] text-[#004d99]">table_rows</span>
-              Detalle de Elementos y Auditoría de Obra
+            <h3 className="text-sm sm:text-base font-bold text-[#0f172a] uppercase tracking-wide flex items-center gap-2">
+              <span className="material-symbols-outlined text-[20px] text-[#004d99]">table_rows</span>
+              <span>Detalle de Elementos y Auditoría de Obra</span>
             </h3>
-            <p className="text-xs text-[#64748b]">
+            <p className="text-xs text-[#64748b] mt-0.5">
               Mostrando {displayItems.length} registros según los filtros seleccionados
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
             {/* Filtro Tipo */}
-            <div className="flex gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200 text-xs">
+            <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200 text-xs">
               <button
                 type="button"
                 onClick={() => setTableFilterType('TODOS')}
-                className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
-                  tableFilterType === 'TODOS' ? 'bg-white text-[#004d99] shadow-2xs' : 'text-slate-600'
+                className={`min-h-[44px] sm:min-h-[36px] px-3 py-1.5 rounded-lg font-bold transition-all text-center flex items-center justify-center ${
+                  tableFilterType === 'TODOS' ? 'bg-white text-[#004d99] shadow-2xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Todos
@@ -670,8 +676,8 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
               <button
                 type="button"
                 onClick={() => setTableFilterType('CAMARA')}
-                className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
-                  tableFilterType === 'CAMARA' ? 'bg-white text-[#004d99] shadow-2xs' : 'text-slate-600'
+                className={`min-h-[44px] sm:min-h-[36px] px-3 py-1.5 rounded-lg font-bold transition-all text-center flex items-center justify-center ${
+                  tableFilterType === 'CAMARA' ? 'bg-white text-[#004d99] shadow-2xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Cámaras
@@ -679,8 +685,8 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
               <button
                 type="button"
                 onClick={() => setTableFilterType('TUBERIA')}
-                className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
-                  tableFilterType === 'TUBERIA' ? 'bg-white text-[#004d99] shadow-2xs' : 'text-slate-600'
+                className={`min-h-[44px] sm:min-h-[36px] px-3 py-1.5 rounded-lg font-bold transition-all text-center flex items-center justify-center ${
+                  tableFilterType === 'TUBERIA' ? 'bg-white text-[#004d99] shadow-2xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Tramos
@@ -688,8 +694,8 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
             </div>
 
             {/* Buscador interno */}
-            <div className="relative">
-              <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[16px]">
+            <div className="relative w-full sm:w-auto">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">
                 search
               </span>
               <input
@@ -697,14 +703,114 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
                 value={searchTableQuery}
                 onChange={(e) => setSearchTableQuery(e.target.value)}
                 placeholder="Buscar código, tramo..."
-                className="bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs text-[#0f172a] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#004d99]"
+                className="w-full min-h-[44px] sm:min-h-[38px] bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm text-[#0f172a] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#004d99]"
               />
             </div>
           </div>
         </div>
 
-        {/* Contenedor Tabular */}
-        <div className="overflow-x-auto rounded-xl border border-[#e2e8f0]">
+        {/* VISTA MÓVIL: Tarjetas fluidas */}
+        <div className="block sm:hidden space-y-3">
+          {displayItems.length === 0 ? (
+            <div className="py-8 text-center text-slate-400 text-sm">
+              No se encontraron elementos con los filtros aplicados.
+            </div>
+          ) : (
+            displayItems.slice(0, 50).map((photo) => {
+              const isCam = photo.elementType === 'camara' || (!photo.elementType && Boolean(photo.cameraCode));
+              const isTerminado = photo.executionStatus === 'Terminado';
+              const isEnProceso = photo.executionStatus === 'En proceso';
+              const progressPct = getPhotoProgressPercentage(photo);
+              const linearInfo = getPhotoRealLinearMeters(photo);
+              const realMeters = linearInfo.totalLinearMeters;
+
+              return (
+                <div
+                  key={photo.id}
+                  onClick={() => onSelectPhoto(photo)}
+                  className="bg-slate-50 border border-slate-200 rounded-2xl p-4 shadow-2xs active:bg-blue-50 transition-colors space-y-2.5"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-bold text-sm text-[#0f172a]">{photo.name}</div>
+                      <div className="text-[11px] text-slate-500 font-mono mt-0.5">{photo.displayId} · {photo.location}</div>
+                    </div>
+                    <span
+                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-bold text-[11px] shrink-0 ${
+                        isTerminado
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : isEnProceso
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-slate-200 text-slate-700'
+                      }`}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                      {photo.executionStatus || 'No iniciado'}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    {isCam ? (
+                      <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 font-bold">
+                        Cámara {photo.cameraType || photo.categoryLabel}
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-md bg-teal-100 text-teal-800 font-bold">
+                        {realMeters.toFixed(1)} m {linearInfo.multiplier > 1 ? `(${linearInfo.multiplier}×${linearInfo.distanceMeters.toFixed(1)}m)` : ''}
+                      </span>
+                    )}
+                    {(photo.acta || photo.actaItem?.code) && (
+                      <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 font-bold">
+                        {photo.acta || photo.actaItem?.code}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Barra de progreso */}
+                  <div>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-slate-500 font-medium">Avance físico:</span>
+                      <span className="font-bold text-slate-800 font-mono">{progressPct}%</span>
+                    </div>
+                    <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                      <div
+                        className={`h-2 rounded-full ${getProgressColor(progressPct)}`}
+                        style={{ width: `${progressPct}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {photo.fieldNotes && (
+                    <div className="text-xs text-slate-600 bg-white p-2 rounded-xl border border-slate-200">
+                      {photo.fieldNotes}
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between pt-1">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onNavigateToMap(photo);
+                      }}
+                      className="min-h-[44px] px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-[#004d99] flex items-center gap-1.5 shadow-2xs"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">location_searching</span>
+                      <span>Ver en Plano</span>
+                    </button>
+                    <span className="text-xs text-slate-400 font-medium flex items-center gap-1">
+                      <span>Tocar para ver</span>
+                      <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                    </span>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Contenedor Tabular (Escritorio) */}
+        <div className="hidden sm:block overflow-x-auto rounded-xl border border-[#e2e8f0]">
           <table className="w-full text-left text-xs">
             <thead className="bg-[#f8fafc] text-[#475569] font-bold border-b border-[#e2e8f0]">
               <tr>

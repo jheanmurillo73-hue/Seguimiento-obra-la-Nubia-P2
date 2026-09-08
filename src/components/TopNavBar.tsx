@@ -78,24 +78,24 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
 
   return (
     <>
-      <header className="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-4 sm:px-6 h-16 bg-[#f3faff] border-b border-[#c2c6d4] shadow-xs">
+      <header className="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-3 sm:px-6 h-16 bg-[#f3faff] border-b border-[#c2c6d4] shadow-xs">
         {/* Left: Brand & Mobile Menu button */}
-        <div className="flex items-center gap-3 md:gap-6">
+        <div className="flex items-center gap-2 sm:gap-3 md:gap-6 min-w-0">
           <button
             type="button"
             onClick={onToggleMobileMenu}
-            className="md:hidden p-2 text-[#424752] hover:text-[#004d99] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#004d99]"
+            className="md:hidden w-12 h-12 shrink-0 flex items-center justify-center text-[#004d99] bg-[#e6f6ff] hover:bg-[#cfe6f2] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#004d99] transition-colors"
             aria-label="Abrir menú de navegación"
           >
-            <span className="material-symbols-outlined text-[24px]">menu</span>
+            <span className="material-symbols-outlined text-[26px]">menu</span>
           </button>
 
           <button
             type="button"
             onClick={() => onTabChange('dashboard')}
-            className="text-left font-['Hanken_Grotesk'] text-xl sm:text-2xl font-bold text-[#004d99] hover:opacity-90 transition-opacity tracking-tight flex items-center gap-2"
+            className="text-left font-['Hanken_Grotesk'] text-base sm:text-2xl font-black text-[#004d99] hover:opacity-90 transition-opacity tracking-tight flex items-center gap-2 truncate"
           >
-            <span>TRACKING LA NUBIA</span>
+            <span className="truncate">TRACKING LA NUBIA</span>
           </button>
 
           {/* Desktop Nav links */}
@@ -119,23 +119,23 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
         </div>
 
         {/* Right Action Icons & Avatar */}
-        <div className="flex items-center gap-2 sm:gap-3 relative">
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0 relative">
           <button
             type="button"
             onClick={onRefreshConnection}
-            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-[#004d99] ${connectionPresentation.badgeClass}`}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 sm:px-3 py-1.5 min-h-[38px] text-[11px] sm:text-xs font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-[#004d99] ${connectionPresentation.badgeClass}`}
             title={connectionPresentation.title}
             aria-label={`Estado de conexión: ${connectionPresentation.label}. Activar para actualizar.`}
           >
-            <span className={`h-2 w-2 shrink-0 rounded-full ${connectionPresentation.dotClass}`} aria-hidden="true"></span>
+            <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${connectionPresentation.dotClass}`} aria-hidden="true"></span>
             <span className="hidden sm:inline">{connectionPresentation.label}</span>
             <span className="sm:hidden">{connectionState === 'connected' ? 'En línea' : connectionState === 'disconnected' ? 'Sin red' : '…'}</span>
           </button>
 
           {/* Local Device Storage Active Badge */}
-          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold" title="Tus fotos y datos se guardan en la memoria de tu PC o celular">
+          <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold" title="Tus fotos y datos se guardan en la memoria de tu PC o celular">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>Memoria Local Activa</span>
+            <span>Memoria Local</span>
           </div>
 
           {/* Notifications Dropdown */}
@@ -143,12 +143,13 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
             <button
               type="button"
               onClick={() => setShowNotifications(!showNotifications)}
-              className="p-1.5 text-[#424752] hover:text-[#004d99] hover:bg-[#cfe6f2]/50 rounded-lg transition-colors relative"
+              className="w-11 h-11 flex items-center justify-center text-[#424752] hover:text-[#004d99] hover:bg-[#cfe6f2]/50 rounded-xl transition-colors relative"
               title="Notificaciones"
+              aria-label="Ver notificaciones"
             >
-              <span className="material-symbols-outlined text-[22px]">notifications</span>
+              <span className="material-symbols-outlined text-[24px]">notifications</span>
               {activities.length > 0 && (
-                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-[#ba1a1a] rounded-full ring-2 ring-[#f3faff]"></span>
+                <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-[#ba1a1a] rounded-full ring-2 ring-[#f3faff]"></span>
               )}
             </button>
 
@@ -206,10 +207,11 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
           <button
             type="button"
             onClick={() => setShowHelpModal(true)}
-            className="p-1.5 text-[#424752] hover:text-[#004d99] hover:bg-[#cfe6f2]/50 rounded-lg transition-colors"
+            className="w-11 h-11 flex items-center justify-center text-[#424752] hover:text-[#004d99] hover:bg-[#cfe6f2]/50 rounded-xl transition-colors"
             title="Ayuda e Información del Sistema"
+            aria-label="Ayuda del sistema"
           >
-            <span className="material-symbols-outlined text-[22px]">help_outline</span>
+            <span className="material-symbols-outlined text-[24px]">help_outline</span>
           </button>
 
           {/* Supabase Auth / User Button */}
@@ -217,10 +219,10 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
             <button
               type="button"
               onClick={onOpenAuth}
-              className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#f0f4f8] text-[#424752] hover:bg-[#e2e8f0] font-['Inter'] font-bold text-[12px] transition-all"
+              className="hidden lg:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#f0f4f8] text-[#424752] hover:bg-[#e2e8f0] font-['Inter'] font-bold text-[12px] transition-all min-h-[40px]"
               title="Autenticación con Supabase"
             >
-              <span className="material-symbols-outlined text-[16px]">lock_person</span>
+              <span className="material-symbols-outlined text-[18px]">lock_person</span>
               <span>Auth</span>
             </button>
           )}
@@ -229,13 +231,14 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
           <button
             type="button"
             onClick={onOpenProfile}
-            className="flex items-center gap-2 group p-0.5 rounded-full hover:ring-2 hover:ring-[#004d99] transition-all"
+            className="w-11 h-11 flex items-center justify-center rounded-full hover:ring-2 hover:ring-[#004d99] transition-all p-0.5"
             title="Ver Perfil del Inspector"
+            aria-label="Ver perfil"
           >
             <img
               src={inspector.avatarUrl}
               alt={inspector.name}
-              className="w-8 h-8 rounded-full object-cover border border-[#c2c6d4]"
+              className="w-9 h-9 rounded-full object-cover border border-[#c2c6d4]"
             />
           </button>
         </div>

@@ -100,45 +100,45 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   return (
     <div className="max-w-[1280px] mx-auto w-full space-y-6">
       {/* Top View Selector Bar: Control de Obra (Power BI) vs Galería Reciente */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-2 sm:p-2.5 rounded-2xl border border-[#c2c6d4] shadow-2xs">
-        <div className="flex items-center gap-1.5 p-1 bg-[#f1f5f9] rounded-xl border border-[#cbd5e1] w-full sm:w-auto">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-2.5 sm:p-3 rounded-2xl border border-[#c2c6d4] shadow-2xs">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-1 bg-[#f1f5f9] rounded-xl border border-[#cbd5e1] w-full sm:w-auto">
           <button
             type="button"
             onClick={() => setActiveSubTab('control_obra')}
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 min-h-[48px] rounded-xl text-xs sm:text-sm font-bold transition-all ${
               activeSubTab === 'control_obra'
                 ? 'bg-[#004d99] text-white shadow-xs'
                 : 'text-[#334155] hover:bg-white hover:text-[#004d99]'
             }`}
           >
-            <span className="material-symbols-outlined text-[18px]">analytics</span>
+            <span className="material-symbols-outlined text-[20px] shrink-0">analytics</span>
             <span>Control de Obra (Power BI)</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-blue-100 text-blue-900 border border-blue-200">
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-900 border border-blue-200">
               Nuevo
             </span>
           </button>
           <button
             type="button"
             onClick={() => setActiveSubTab('galeria')}
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 min-h-[48px] rounded-xl text-xs sm:text-sm font-bold transition-all ${
               activeSubTab === 'galeria'
                 ? 'bg-[#004d99] text-white shadow-xs'
                 : 'text-[#334155] hover:bg-white hover:text-[#004d99]'
             }`}
           >
-            <span className="material-symbols-outlined text-[18px]">grid_view</span>
-            <span>Galería de Fotos ({photos.length})</span>
+            <span className="material-symbols-outlined text-[20px] shrink-0">grid_view</span>
+            <span>Galería ({photos.length})</span>
           </button>
         </div>
 
-        <div className="flex items-center gap-2 justify-end">
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
           <button
             type="button"
             onClick={onNavigateToUpload}
-            className="bg-[#004d99] hover:bg-[#00468c] text-white font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-1.5 transition-colors shadow-xs"
+            className="w-full sm:w-auto min-h-[48px] bg-[#004d99] hover:bg-[#00468c] text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-xs"
           >
-            <span className="material-symbols-outlined text-[18px]">upload</span>
-            Subir Nueva Foto
+            <span className="material-symbols-outlined text-[20px]">upload</span>
+            <span>Subir Nueva Foto</span>
           </button>
         </div>
       </div>

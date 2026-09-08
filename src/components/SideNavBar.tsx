@@ -55,6 +55,11 @@ export const SideNavBar: React.FC<SideNavBarProps> = ({
       icon: 'history',
     },
     {
+      id: 'activity',
+      label: 'Actividad de Campo',
+      icon: 'receipt_long',
+    },
+    {
       id: 'settings',
       label: 'Configuración',
       icon: 'settings',
@@ -84,20 +89,20 @@ export const SideNavBar: React.FC<SideNavBarProps> = ({
                 key={item.id}
                 type="button"
                 onClick={() => handleNavClick(item.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-['Inter'] font-bold text-[14px] tracking-[0.02em] transition-all text-left ${
+                className={`w-full min-h-[48px] flex items-center gap-3.5 px-4 py-3 rounded-xl font-['Inter'] font-bold text-[14px] tracking-[0.02em] transition-all text-left ${
                   isActive
-                    ? 'bg-[#1565c0] text-[#dae5ff] shadow-xs scale-[0.98]'
+                    ? 'bg-[#004d99] text-white shadow-xs'
                     : 'text-[#424752] hover:bg-[#cfe6f2] hover:text-[#004d99]'
                 }`}
               >
                 <span
-                  className={`material-symbols-outlined text-[20px] ${
+                  className={`material-symbols-outlined text-[22px] shrink-0 ${
                     isActive ? 'fill-icon' : ''
                   }`}
                 >
                   {item.icon}
                 </span>
-                <span>{item.label}</span>
+                <span className="truncate">{item.label}</span>
               </button>
             );
           })}
@@ -105,16 +110,16 @@ export const SideNavBar: React.FC<SideNavBarProps> = ({
 
         {/* Device Storage Status Indicator */}
         <div className="mt-6 pt-4 border-t border-[#c2c6d4]">
-          <div className="p-3 bg-[#f3faff] border border-[#c2c6d4] rounded-xl">
+          <div className="p-3.5 bg-[#f3faff] border border-[#c2c6d4] rounded-xl">
             <div className="flex items-center gap-2 text-[#004d99]">
-              <span className="material-symbols-outlined text-[18px]">smartphone</span>
-              <span className="material-symbols-outlined text-[18px]">laptop</span>
+              <span className="material-symbols-outlined text-[20px]">smartphone</span>
+              <span className="material-symbols-outlined text-[20px]">laptop</span>
             </div>
-            <div className="font-['Inter'] font-bold text-[12px] text-[#071e27] mt-1.5">
+            <div className="font-['Inter'] font-bold text-[13px] text-[#071e27] mt-1.5">
               Memoria del Dispositivo
             </div>
-            <div className="text-[11px] text-[#727783] mt-0.5">
-              Tus fotos y registros se guardan en tu PC o celular.
+            <div className="text-[12px] text-[#727783] mt-0.5 leading-relaxed">
+              Tus fotos y registros se guardan en tu celular o computador.
             </div>
           </div>
         </div>
@@ -125,13 +130,13 @@ export const SideNavBar: React.FC<SideNavBarProps> = ({
         {/* Active User Info */}
         <div
           onClick={onOpenProfile}
-          className="flex items-center gap-2.5 p-2 rounded-xl hover:bg-[#cfe6f2]/50 transition-colors cursor-pointer"
+          className="min-h-[48px] flex items-center gap-3 p-2.5 rounded-xl hover:bg-[#cfe6f2]/50 transition-colors cursor-pointer"
           title="Ver o editar credenciales"
         >
           <img
             src={inspector.avatarUrl}
             alt={inspector.name}
-            className="w-8 h-8 rounded-full object-cover border border-[#c2c6d4]"
+            className="w-9 h-9 rounded-full object-cover border border-[#c2c6d4] shrink-0"
           />
           <div className="min-w-0 flex-1">
             <div className="font-['Inter'] font-bold text-[13px] text-[#071e27] truncate">
@@ -153,18 +158,18 @@ export const SideNavBar: React.FC<SideNavBarProps> = ({
               onOpenAuth();
               onCloseMobile();
             }}
-            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-['Inter'] font-bold text-[13px] text-[#004d99] bg-[#cfe6f2]/50 hover:bg-[#cfe6f2] transition-all text-left"
+            className="w-full min-h-[48px] flex items-center gap-3 px-4 py-3 rounded-xl font-['Inter'] font-bold text-[13px] text-[#004d99] bg-[#cfe6f2]/50 hover:bg-[#cfe6f2] transition-all text-left"
           >
-            <span className="material-symbols-outlined text-[18px]">lock_person</span>
+            <span className="material-symbols-outlined text-[20px] shrink-0">lock_person</span>
             <span>Cambiar Cuenta</span>
           </button>
         )}
         <button
           type="button"
           onClick={onSignOut}
-          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-['Inter'] font-bold text-[13px] text-[#424752] hover:bg-[#ffdad6] hover:text-[#ba1a1a] transition-all text-left"
+          className="w-full min-h-[48px] flex items-center gap-3 px-4 py-3 rounded-xl font-['Inter'] font-bold text-[13px] text-[#424752] hover:bg-[#ffdad6] hover:text-[#ba1a1a] transition-all text-left"
         >
-          <span className="material-symbols-outlined text-[18px]">logout</span>
+          <span className="material-symbols-outlined text-[20px] shrink-0">logout</span>
           <span>Cerrar Sesión</span>
         </button>
       </div>
@@ -182,20 +187,26 @@ export const SideNavBar: React.FC<SideNavBarProps> = ({
       {isMobileOpen && (
         <div className="fixed inset-0 z-50 md:hidden flex">
           <div
-            className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity"
+            className="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity"
             onClick={onCloseMobile}
           />
-          <div className="relative w-64 max-w-[80vw] h-full bg-[#e6f6ff] border-r border-[#c2c6d4] shadow-2xl flex flex-col z-10 animate-in slide-in-from-left duration-200">
+          <div className="relative w-[82vw] max-w-xs h-full bg-[#e6f6ff] border-r border-[#c2c6d4] shadow-2xl flex flex-col z-10 animate-in slide-in-from-left duration-200">
             <div className="flex items-center justify-between p-4 border-b border-[#c2c6d4] bg-[#f3faff]">
-              <div className="font-['Hanken_Grotesk'] font-bold text-[#004d99] text-lg">
-                PhotoVault Pro
+              <div>
+                <div className="font-['Hanken_Grotesk'] font-black text-[#004d99] text-base leading-tight">
+                  TRACKING LA NUBIA
+                </div>
+                <div className="text-[11px] text-slate-500 font-semibold">
+                  PhotoVault Pro Mobile
+                </div>
               </div>
               <button
                 type="button"
                 onClick={onCloseMobile}
-                className="p-1 rounded-lg text-[#424752] hover:text-[#ba1a1a]"
+                className="w-11 h-11 flex items-center justify-center rounded-xl text-[#424752] hover:text-[#ba1a1a] hover:bg-white/80 transition-colors"
+                aria-label="Cerrar menú"
               >
-                <span className="material-symbols-outlined">close</span>
+                <span className="material-symbols-outlined text-[24px]">close</span>
               </button>
             </div>
             <div className="flex-1 overflow-y-auto">
