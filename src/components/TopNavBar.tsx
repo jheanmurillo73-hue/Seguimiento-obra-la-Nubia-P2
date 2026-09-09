@@ -78,22 +78,22 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
 
   return (
     <>
-      <header className="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-3 sm:px-6 h-16 bg-[#f3faff] border-b border-[#c2c6d4] shadow-xs">
+      <header className="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-2.5 sm:px-6 h-16 bg-[#f3faff] border-b border-[#c2c6d4] shadow-xs max-w-full overflow-hidden">
         {/* Left: Brand & Mobile Menu button */}
-        <div className="flex items-center gap-2 sm:gap-3 md:gap-6 min-w-0">
+        <div className="flex items-center gap-1.5 sm:gap-3 md:gap-6 min-w-0">
           <button
             type="button"
             onClick={onToggleMobileMenu}
-            className="md:hidden w-12 h-12 shrink-0 flex items-center justify-center text-[#004d99] bg-[#e6f6ff] hover:bg-[#cfe6f2] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#004d99] transition-colors"
+            className="md:hidden w-10 h-10 shrink-0 flex items-center justify-center text-[#004d99] bg-[#e6f6ff] hover:bg-[#cfe6f2] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#004d99] transition-colors"
             aria-label="Abrir menú de navegación"
           >
-            <span className="material-symbols-outlined text-[26px]">menu</span>
+            <span className="material-symbols-outlined text-[22px] sm:text-[26px]">menu</span>
           </button>
 
           <button
             type="button"
             onClick={() => onTabChange('dashboard')}
-            className="text-left font-['Hanken_Grotesk'] text-base sm:text-2xl font-black text-[#004d99] hover:opacity-90 transition-opacity tracking-tight flex items-center gap-2 truncate"
+            className="text-left font-['Hanken_Grotesk'] text-sm sm:text-2xl font-black text-[#004d99] hover:opacity-90 transition-opacity tracking-tight flex items-center gap-1 sm:gap-2 truncate min-w-0"
           >
             <span className="truncate">TRACKING LA NUBIA</span>
           </button>
@@ -119,11 +119,11 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
         </div>
 
         {/* Right Action Icons & Avatar */}
-        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0 relative">
+        <div className="flex items-center gap-1 sm:gap-2.5 shrink-0 relative">
           <button
             type="button"
             onClick={onRefreshConnection}
-            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 sm:px-3 py-1.5 min-h-[38px] text-[11px] sm:text-xs font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-[#004d99] ${connectionPresentation.badgeClass}`}
+            className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-full border px-2 sm:px-3 py-1 sm:py-1.5 min-h-[34px] sm:min-h-[38px] text-[10px] sm:text-xs font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-[#004d99] shrink-0 ${connectionPresentation.badgeClass}`}
             title={connectionPresentation.title}
             aria-label={`Estado de conexión: ${connectionPresentation.label}. Activar para actualizar.`}
           >
@@ -139,17 +139,17 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
           </div>
 
           {/* Notifications Dropdown */}
-          <div className="relative">
+          <div className="relative shrink-0">
             <button
               type="button"
               onClick={() => setShowNotifications(!showNotifications)}
-              className="w-11 h-11 flex items-center justify-center text-[#424752] hover:text-[#004d99] hover:bg-[#cfe6f2]/50 rounded-xl transition-colors relative"
+              className="w-9 h-9 sm:w-11 sm:h-11 flex items-center justify-center text-[#424752] hover:text-[#004d99] hover:bg-[#cfe6f2]/50 rounded-xl transition-colors relative"
               title="Notificaciones"
               aria-label="Ver notificaciones"
             >
-              <span className="material-symbols-outlined text-[24px]">notifications</span>
+              <span className="material-symbols-outlined text-[20px] sm:text-[24px]">notifications</span>
               {activities.length > 0 && (
-                <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-[#ba1a1a] rounded-full ring-2 ring-[#f3faff]"></span>
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 sm:w-2.5 sm:h-2.5 bg-[#ba1a1a] rounded-full ring-2 ring-[#f3faff]"></span>
               )}
             </button>
 
@@ -207,11 +207,11 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
           <button
             type="button"
             onClick={() => setShowHelpModal(true)}
-            className="w-11 h-11 flex items-center justify-center text-[#424752] hover:text-[#004d99] hover:bg-[#cfe6f2]/50 rounded-xl transition-colors"
+            className="w-9 h-9 sm:w-11 sm:h-11 shrink-0 flex items-center justify-center text-[#424752] hover:text-[#004d99] hover:bg-[#cfe6f2]/50 rounded-xl transition-colors"
             title="Ayuda e Información del Sistema"
             aria-label="Ayuda del sistema"
           >
-            <span className="material-symbols-outlined text-[24px]">help_outline</span>
+            <span className="material-symbols-outlined text-[20px] sm:text-[24px]">help_outline</span>
           </button>
 
           {/* Supabase Auth / User Button */}
@@ -231,14 +231,14 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
           <button
             type="button"
             onClick={onOpenProfile}
-            className="w-11 h-11 flex items-center justify-center rounded-full hover:ring-2 hover:ring-[#004d99] transition-all p-0.5"
+            className="w-9 h-9 sm:w-11 sm:h-11 shrink-0 flex items-center justify-center rounded-full hover:ring-2 hover:ring-[#004d99] transition-all p-0.5"
             title="Ver Perfil del Inspector"
             aria-label="Ver perfil"
           >
             <img
               src={inspector.avatarUrl}
               alt={inspector.name}
-              className="w-9 h-9 rounded-full object-cover border border-[#c2c6d4]"
+              className="w-7 h-7 sm:w-9 sm:h-9 rounded-full object-cover border border-[#c2c6d4]"
             />
           </button>
         </div>

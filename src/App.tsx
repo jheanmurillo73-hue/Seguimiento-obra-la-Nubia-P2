@@ -884,7 +884,7 @@ export default function App() {
         onRefreshConnection={refreshConnection}
       />
 
-      <div className="flex flex-1 pt-16">
+      <div className="flex flex-1 pt-16 w-full max-w-full min-w-0 overflow-x-hidden">
         {/* Fixed Side Nav Bar (Desktop & Mobile Drawer) */}
         <SideNavBar
           currentTab={currentTab}
@@ -901,8 +901,8 @@ export default function App() {
         />
 
         {/* Main Content Area */}
-        <div className={`flex-1 md:ml-64 flex flex-col ${currentTab === 'map' ? 'h-[calc(100vh-64px)] overflow-hidden' : 'min-h-[calc(100vh-64px)] justify-between'}`}>
-          <main className={`${currentTab === 'map' ? 'p-0 h-full w-full relative overflow-hidden' : 'p-4 sm:p-6 lg:p-8 flex-1'}`}>
+        <div className={`flex-1 md:ml-64 flex flex-col w-full max-w-full min-w-0 overflow-x-hidden ${currentTab === 'map' ? 'h-[calc(100vh-64px)] overflow-hidden' : 'min-h-[calc(100vh-64px)] justify-between'}`}>
+          <main className={`${currentTab === 'map' ? 'p-0 h-full w-full relative overflow-hidden' : 'p-2.5 sm:p-6 lg:p-8 flex-1 w-full max-w-full min-w-0 overflow-x-hidden'}`}>
             {currentTab === 'admin' && userAccess.role === 'admin' ? (
               <UserManagementView currentUser={userAccess} onShowToast={showToast} />
             ) : currentTab === 'detail' && selectedPhoto ? (

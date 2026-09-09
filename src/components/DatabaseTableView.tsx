@@ -584,20 +584,20 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-200">
+    <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-200 w-full max-w-full min-w-0 overflow-hidden">
       {/* ----------------- HEADER & ACTIONS ----------------- */}
-      <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-[#c2c6d4] shadow-xs space-y-3.5">
+      <div className="bg-white p-3 sm:p-5 rounded-2xl border border-[#c2c6d4] shadow-xs space-y-3 w-full max-w-full min-w-0 overflow-hidden">
         {/* Top Row: Title + Mobile View Switcher */}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-[#e6f6ff] text-[#004d99] flex items-center justify-center border border-[#cfe6f2] shrink-0">
-              <span className="material-symbols-outlined text-[22px] sm:text-[24px]">database</span>
+        <div className="flex items-center justify-between gap-2 sm:gap-3 min-w-0">
+          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#e6f6ff] text-[#004d99] flex items-center justify-center border border-[#cfe6f2] shrink-0">
+              <span className="material-symbols-outlined text-[20px] sm:text-[24px]">database</span>
             </div>
             <div className="min-w-0">
-              <h1 className="font-['Hanken_Grotesk'] font-bold text-lg sm:text-2xl text-[#071e27] truncate">
+              <h1 className="font-['Hanken_Grotesk'] font-bold text-base sm:text-2xl text-[#071e27] truncate">
                 Base de Datos de Obra
               </h1>
-              <p className="text-xs sm:text-sm text-[#424752] font-['Inter'] line-clamp-1 sm:line-clamp-none">
+              <p className="text-[11px] sm:text-sm text-[#424752] font-['Inter'] line-clamp-1 sm:line-clamp-none">
                 Inventario técnico tabulado de cámaras, tramos de canalización y metrajes
               </p>
             </div>
@@ -633,30 +633,30 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
         </div>
 
         {/* Quick Network Breakdown: Mobile Grid (sm:hidden) */}
-        <div className="grid grid-cols-2 gap-2 sm:hidden">
+        <div className="grid grid-cols-2 gap-2 sm:hidden w-full max-w-full min-w-0">
           {/* MT Card */}
           <button
             type="button"
             onClick={() => setFilterType(filterType === 'MT' ? 'all' : 'MT')}
-            className={`p-2.5 rounded-xl text-left border transition-all ${
+            className={`p-2 sm:p-2.5 rounded-xl text-left border transition-all w-full min-w-0 overflow-hidden ${
               filterType === 'MT'
                 ? 'bg-blue-600 text-white border-blue-600 ring-2 ring-blue-600/30'
                 : 'bg-blue-50/70 text-blue-900 border-blue-200/80 active:bg-blue-100'
             }`}
           >
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold flex items-center gap-1">
+            <div className="flex items-center justify-between min-w-0">
+              <span className="text-[11px] font-bold flex items-center gap-1 truncate">
                 <span className="material-symbols-outlined text-[14px]">electrical_services</span>
                 MT
               </span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono ${filterType === 'MT' ? 'bg-white/20 text-white' : 'bg-blue-200/60 text-blue-800'}`}>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono shrink-0 ${filterType === 'MT' ? 'bg-white/20 text-white' : 'bg-blue-200/60 text-blue-800'}`}>
                 {networkSummary.mt.count} un.
               </span>
             </div>
             <div className="mt-1 text-xs font-mono font-bold leading-tight truncate">
-              {networkSummary.mt.ejecMeters}m <span className="text-[10px] font-normal opacity-80">/ {networkSummary.mt.presupMeters}m</span>
+              {networkSummary.mt.ejecMeters}m <span className="text-[10px] font-normal opacity-80">/{networkSummary.mt.presupMeters}m</span>
             </div>
-            <div className="text-[10px] opacity-80 mt-0.5">
+            <div className="text-[10px] opacity-80 mt-0.5 truncate">
               Avance: {networkSummary.mt.pct}%
             </div>
           </button>
@@ -665,25 +665,25 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
           <button
             type="button"
             onClick={() => setFilterType(filterType === 'BT' ? 'all' : 'BT')}
-            className={`p-2.5 rounded-xl text-left border transition-all ${
+            className={`p-2 sm:p-2.5 rounded-xl text-left border transition-all w-full min-w-0 overflow-hidden ${
               filterType === 'BT'
                 ? 'bg-amber-600 text-white border-amber-600 ring-2 ring-amber-600/30'
                 : 'bg-amber-50/70 text-amber-900 border-amber-200/80 active:bg-amber-100'
             }`}
           >
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold flex items-center gap-1">
+            <div className="flex items-center justify-between min-w-0">
+              <span className="text-[11px] font-bold flex items-center gap-1 truncate">
                 <span className="material-symbols-outlined text-[14px]">bolt</span>
                 BT
               </span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono ${filterType === 'BT' ? 'bg-white/20 text-white' : 'bg-amber-200/60 text-amber-800'}`}>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono shrink-0 ${filterType === 'BT' ? 'bg-white/20 text-white' : 'bg-amber-200/60 text-amber-800'}`}>
                 {networkSummary.bt.count} un.
               </span>
             </div>
             <div className="mt-1 text-xs font-mono font-bold leading-tight truncate">
-              {networkSummary.bt.ejecMeters}m <span className="text-[10px] font-normal opacity-80">/ {networkSummary.bt.presupMeters}m</span>
+              {networkSummary.bt.ejecMeters}m <span className="text-[10px] font-normal opacity-80">/{networkSummary.bt.presupMeters}m</span>
             </div>
-            <div className="text-[10px] opacity-80 mt-0.5">
+            <div className="text-[10px] opacity-80 mt-0.5 truncate">
               Avance: {networkSummary.bt.pct}%
             </div>
           </button>
@@ -692,44 +692,44 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
           <button
             type="button"
             onClick={() => setFilterType(filterType === 'DATOS' ? 'all' : 'DATOS')}
-            className={`p-2.5 rounded-xl text-left border transition-all ${
+            className={`p-2 sm:p-2.5 rounded-xl text-left border transition-all w-full min-w-0 overflow-hidden ${
               filterType === 'DATOS'
                 ? 'bg-teal-700 text-white border-teal-700 ring-2 ring-teal-700/30'
                 : 'bg-teal-50/70 text-teal-900 border-teal-200/80 active:bg-teal-100'
             }`}
           >
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold flex items-center gap-1">
+            <div className="flex items-center justify-between min-w-0">
+              <span className="text-[11px] font-bold flex items-center gap-1 truncate">
                 <span className="material-symbols-outlined text-[14px]">settings_ethernet</span>
                 Datos
               </span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono ${filterType === 'DATOS' ? 'bg-white/20 text-white' : 'bg-teal-200/60 text-teal-800'}`}>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono shrink-0 ${filterType === 'DATOS' ? 'bg-white/20 text-white' : 'bg-teal-200/60 text-teal-800'}`}>
                 {networkSummary.datos.count} un.
               </span>
             </div>
             <div className="mt-1 text-xs font-mono font-bold leading-tight truncate">
-              {networkSummary.datos.ejecMeters}m <span className="text-[10px] font-normal opacity-80">/ {networkSummary.datos.presupMeters}m</span>
+              {networkSummary.datos.ejecMeters}m <span className="text-[10px] font-normal opacity-80">/{networkSummary.datos.presupMeters}m</span>
             </div>
-            <div className="text-[10px] opacity-80 mt-0.5">
+            <div className="text-[10px] opacity-80 mt-0.5 truncate">
               Avance: {networkSummary.datos.pct}%
             </div>
           </button>
 
           {/* TOTAL OBRA Card */}
-          <div className="p-2.5 rounded-xl text-left border bg-slate-100/80 text-slate-800 border-slate-200">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold flex items-center gap-1 text-slate-700">
+          <div className="p-2 sm:p-2.5 rounded-xl text-left border bg-slate-100/80 text-slate-800 border-slate-200 w-full min-w-0 overflow-hidden">
+            <div className="flex items-center justify-between min-w-0">
+              <span className="text-[11px] font-bold flex items-center gap-1 text-slate-700 truncate">
                 <span className="material-symbols-outlined text-[14px]">account_tree</span>
                 Obra
               </span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded-md font-mono bg-slate-200 text-slate-700">
+              <span className="text-[10px] px-1.5 py-0.2 rounded-md font-mono bg-slate-200 text-slate-700 shrink-0">
                 {photos.length} un.
               </span>
             </div>
             <div className="mt-1 text-xs font-mono font-bold leading-tight truncate text-[#071e27]">
-              {networkSummary.totalEjecMeters}m <span className="text-[10px] font-normal text-slate-500">/ {networkSummary.totalPresupMeters}m</span>
+              {networkSummary.totalEjecMeters}m <span className="text-[10px] font-normal text-slate-500">/{networkSummary.totalPresupMeters}m</span>
             </div>
-            <div className="text-[10px] text-slate-500 mt-0.5">
+            <div className="text-[10px] text-slate-500 mt-0.5 truncate">
               Avance: {networkSummary.totalPct}%
             </div>
           </div>
@@ -782,7 +782,7 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
         </div>
 
         {/* Quick Sector Breakdown (Scrollable on mobile) */}
-        <div className="flex items-center gap-1.5 pt-2 border-t border-slate-100 overflow-x-auto no-scrollbar pb-0.5 sm:flex-wrap">
+        <div className="flex items-center gap-1.5 pt-2 border-t border-slate-100 overflow-x-auto no-scrollbar pb-1 sm:flex-wrap w-full max-w-full min-w-0">
           <span className="text-[11px] text-[#424752] font-bold flex items-center gap-1 mr-1 shrink-0">
             <span className="material-symbols-outlined text-[13px] text-[#004d99]">share_location</span>
             Sectores:
@@ -847,56 +847,56 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
         </div>
 
         {/* Action Buttons: Mobile Optimized */}
-        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center justify-between gap-2.5 pt-2 border-t border-slate-100">
+        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center justify-between gap-2 pt-2 border-t border-slate-100 w-full max-w-full min-w-0">
           {/* Primary Mobile Action Buttons (Grid 2-col on mobile, flex on desktop) */}
-          <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
+          <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto min-w-0">
             <button
               type="button"
               onClick={onNavigateToUpload}
-              className="min-h-[44px] px-3.5 py-2.5 bg-[#004d99] hover:bg-[#1565c0] text-white font-['Inter'] font-bold text-xs sm:text-sm rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
+              className="min-h-[42px] sm:min-h-[44px] px-3 py-2 bg-[#004d99] hover:bg-[#1565c0] text-white font-['Inter'] font-bold text-xs sm:text-sm rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] w-full min-w-0 truncate"
             >
-              <span className="material-symbols-outlined text-[18px]">add_circle</span>
+              <span className="material-symbols-outlined text-[18px] shrink-0">add_circle</span>
               <span className="truncate">Nueva Cámara</span>
             </button>
 
             <button
               type="button"
               onClick={() => onNavigateToMap()}
-              className="min-h-[44px] px-3.5 py-2.5 bg-[#cfe6f2] hover:bg-[#b8d8ec] text-[#004d99] font-['Inter'] font-bold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
+              className="min-h-[42px] sm:min-h-[44px] px-3 py-2 bg-[#cfe6f2] hover:bg-[#b8d8ec] text-[#004d99] font-['Inter'] font-bold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] w-full min-w-0 truncate"
             >
-              <span className="material-symbols-outlined text-[18px]">map</span>
+              <span className="material-symbols-outlined text-[18px] shrink-0">map</span>
               <span className="truncate">Ver en Plano</span>
             </button>
           </div>
 
           {/* Export & Print Tools */}
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto min-w-0">
             <button
               type="button"
               onClick={() => handleExportCSV(false)}
-              className="flex-1 sm:flex-none min-h-[44px] px-3.5 py-2.5 bg-white hover:bg-slate-50 text-[#071e27] border border-[#c2c6d4] font-['Inter'] font-semibold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs active:scale-[0.98]"
+              className="flex-1 sm:flex-none min-h-[42px] sm:min-h-[44px] px-3 py-2 bg-white hover:bg-slate-50 text-[#071e27] border border-[#c2c6d4] font-['Inter'] font-semibold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs active:scale-[0.98] min-w-0 truncate"
               title="Exportar archivo CSV para Excel"
             >
-              <span className="material-symbols-outlined text-[18px] text-emerald-600">table_chart</span>
-              <span>Exportar CSV</span>
+              <span className="material-symbols-outlined text-[18px] text-emerald-600 shrink-0">table_chart</span>
+              <span className="truncate">Exportar CSV</span>
             </button>
 
             <button
               type="button"
               onClick={handleExportJSON}
-              className="min-h-[44px] min-w-[44px] p-2.5 bg-white hover:bg-slate-50 text-[#424752] border border-[#c2c6d4] rounded-xl transition-all shadow-xs flex items-center justify-center active:scale-[0.98]"
+              className="min-h-[42px] sm:min-h-[44px] min-w-[42px] sm:min-w-[44px] p-2 bg-white hover:bg-slate-50 text-[#424752] border border-[#c2c6d4] rounded-xl transition-all shadow-xs flex items-center justify-center active:scale-[0.98] shrink-0"
               title="Descargar copia técnica en JSON"
             >
-              <span className="material-symbols-outlined text-[20px]">data_object</span>
+              <span className="material-symbols-outlined text-[18px] sm:text-[20px]">data_object</span>
             </button>
 
             <button
               type="button"
               onClick={handlePrint}
-              className="min-h-[44px] min-w-[44px] p-2.5 bg-white hover:bg-slate-50 text-[#424752] border border-[#c2c6d4] rounded-xl transition-all shadow-xs flex items-center justify-center active:scale-[0.98]"
+              className="min-h-[42px] sm:min-h-[44px] min-w-[42px] sm:min-w-[44px] p-2 bg-white hover:bg-slate-50 text-[#424752] border border-[#c2c6d4] rounded-xl transition-all shadow-xs flex items-center justify-center active:scale-[0.98] shrink-0"
               title="Imprimir tabla o guardar como PDF"
             >
-              <span className="material-symbols-outlined text-[20px]">print</span>
+              <span className="material-symbols-outlined text-[18px] sm:text-[20px]">print</span>
             </button>
           </div>
         </div>
@@ -1231,9 +1231,9 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
       </div>
 
       {/* ----------------- TABULATED DATA TABLE / MOBILE CARDS ----------------- */}
-      <div className="bg-white rounded-2xl border border-[#c2c6d4] shadow-xs overflow-hidden">
+      <div className="bg-white rounded-2xl border border-[#c2c6d4] shadow-xs overflow-hidden w-full max-w-full min-w-0">
         {/* VISTA MÓVIL: Tarjetas fluidas o Vista Compacta (Mobile-First) */}
-        <div className="block lg:hidden p-3 sm:p-4 space-y-2.5">
+        <div className="block lg:hidden p-2.5 sm:p-4 space-y-2.5 w-full max-w-full min-w-0 overflow-hidden">
           {sortedPhotos.length === 0 ? (
             <div className="py-12 text-center text-[#727783]">
               <span className="material-symbols-outlined text-[48px] text-[#c2c6d4] mb-2 block">
@@ -1244,7 +1244,7 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
             </div>
           ) : mobileViewMode === 'compact' ? (
             /* --- MODO COMPACTO PARA MÓVIL --- */
-            <div className="divide-y divide-slate-200 border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs">
+            <div className="divide-y divide-slate-200 border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs w-full max-w-full min-w-0">
               {sortedPhotos.map((photo) => {
                 const isSelected = selectedIds.includes(photo.id);
                 const netInfo = getPhotoNetworkInfo(photo);
@@ -1258,7 +1258,7 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
                 return (
                   <div
                     key={photo.id}
-                    className={`p-2.5 flex items-center gap-2.5 transition-all ${
+                    className={`p-2 sm:p-2.5 flex items-center gap-2 transition-all w-full max-w-full min-w-0 overflow-hidden ${
                       isSelected ? 'bg-[#e6f6ff]/60' : 'hover:bg-slate-50'
                     }`}
                   >
@@ -1368,7 +1368,7 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
               return (
                 <div
                   key={photo.id}
-                  className={`border rounded-2xl p-3.5 space-y-3 transition-all ${
+                  className={`border rounded-2xl p-3 sm:p-3.5 space-y-3 transition-all w-full max-w-full min-w-0 overflow-hidden ${
                     isSelected ? 'bg-[#e6f6ff]/40 border-[#004d99]' : 'bg-[#fcfdff] border-[#c2c6d4]'
                   }`}
                 >
@@ -1599,19 +1599,19 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
 
         {/* Floating Mobile Sticky Batch Actions Bar */}
         {selectedIds.length > 0 && (
-          <div className="lg:hidden fixed bottom-4 inset-x-3 z-40 bg-[#071e27] text-white p-3 rounded-2xl shadow-2xl border border-slate-700 flex items-center justify-between gap-2 animate-in slide-in-from-bottom-3 duration-200">
-            <div className="flex items-center gap-2 text-xs font-bold">
+          <div className="lg:hidden fixed bottom-4 inset-x-2 sm:inset-x-3 z-40 bg-[#071e27] text-white p-2.5 sm:p-3 rounded-2xl shadow-2xl border border-slate-700 flex items-center justify-between gap-1.5 sm:gap-2 animate-in slide-in-from-bottom-3 duration-200 max-w-full">
+            <div className="flex items-center gap-1.5 sm:gap-2 text-xs font-bold shrink-0">
               <span className="w-5 h-5 rounded-full bg-[#004d99] text-white flex items-center justify-center text-[10px]">
                 {selectedIds.length}
               </span>
               <span className="hidden sm:inline">seleccionados</span>
             </div>
 
-            <div className="flex items-center gap-1.5 overflow-x-auto">
+            <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto min-w-0 shrink">
               <button
                 type="button"
                 onClick={() => handleBatchStatusUpdate('Terminado')}
-                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1"
+                className="px-2 sm:px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1 shrink-0"
                 title="Marcar seleccionados como Terminado"
               >
                 <span className="material-symbols-outlined text-[16px]">check_circle</span>
@@ -1621,7 +1621,7 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
               <button
                 type="button"
                 onClick={() => handleBatchStatusUpdate('En proceso')}
-                className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl flex items-center gap-1"
+                className="px-2 sm:px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl flex items-center gap-1 shrink-0"
                 title="Marcar seleccionados como En proceso"
               >
                 <span className="material-symbols-outlined text-[16px]">pending</span>
@@ -1631,7 +1631,7 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
               <button
                 type="button"
                 onClick={handleBatchDelete}
-                className="px-2.5 py-1.5 bg-red-900/80 hover:bg-red-800 text-red-200 font-bold text-xs rounded-xl flex items-center gap-1"
+                className="px-2 sm:px-2.5 py-1.5 bg-red-900/80 hover:bg-red-800 text-red-200 font-bold text-xs rounded-xl flex items-center gap-1 shrink-0"
                 title="Eliminar seleccionados"
               >
                 <span className="material-symbols-outlined text-[16px]">delete</span>
@@ -1640,7 +1640,7 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
               <button
                 type="button"
                 onClick={() => setSelectedIds([])}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg"
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg shrink-0"
                 title="Cancelar selección"
               >
                 <span className="material-symbols-outlined text-[18px]">close</span>
