@@ -10,6 +10,7 @@ interface SideNavBarProps {
   onOpenProfile: () => void;
   isMobileOpen: boolean;
   onCloseMobile: () => void;
+  onOpenMobile?: () => void;
   onSignOut: () => void;
   onOpenAuth?: () => void;
   onOpenSupabaseModal?: () => void;
@@ -24,6 +25,7 @@ export const SideNavBar: React.FC<SideNavBarProps> = ({
   onOpenProfile,
   isMobileOpen,
   onCloseMobile,
+  onOpenMobile,
   onSignOut,
   onOpenAuth,
   onOpenSupabaseModal,
@@ -178,6 +180,19 @@ export const SideNavBar: React.FC<SideNavBarProps> = ({
 
   return (
     <>
+      {/* Botón flotante de menú hamburguesa en la esquina superior izquierda en móvil (< 768px) */}
+      {!isMobileOpen && onOpenMobile && (
+        <button
+          type="button"
+          onClick={onOpenMobile}
+          className="fixed top-3 left-3 z-50 md:hidden flex items-center justify-center w-10 h-10 rounded-xl bg-[#004d99] text-white shadow-lg hover:bg-[#003d7a] active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#004d99]"
+          aria-label="Abrir menú de navegación"
+          title="Abrir menú principal"
+        >
+          <span className="material-symbols-outlined text-[24px]">menu</span>
+        </button>
+      )}
+
       {/* Desktop Fixed SideNav */}
       <aside className="hidden md:flex fixed left-0 top-16 h-[calc(100vh-64px)] w-64 bg-[#e6f6ff] border-r border-[#c2c6d4] z-40 flex-col">
         {navContent}

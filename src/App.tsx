@@ -895,6 +895,7 @@ export default function App() {
           onOpenProfile={() => setIsProfileModalOpen(true)}
           isMobileOpen={isMobileMenuOpen}
           onCloseMobile={() => setIsMobileMenuOpen(false)}
+          onOpenMobile={() => setIsMobileMenuOpen(true)}
           onSignOut={() => setIsSignOutModalOpen(true)}
           onOpenAuth={() => setIsAuthModalOpen(true)}
           onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}

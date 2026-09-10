@@ -4,7 +4,7 @@
  * relativos al plano, nunca como coordenadas de un proveedor cartográfico.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActaLabelPosition, BlueprintCalibration, BlueprintOverlay, ElectricalElementType, ELECTRICAL_ELEMENT_OPTIONS, getCableTypeOption, getElectricalElementOption, getElectricalPlanArea, getPhotoPlanArea, getElementType, getPhotoProgressPercentage, getPipeNetworkOption, InspectionPhoto, InspectorProfile, isElectricalElementType, PlanArea } from '../types';
+import { ActaLabelPosition, BlueprintCalibration, BlueprintOverlay, ElectricalElementType, ELECTRICAL_ELEMENT_OPTIONS, getCableTypeOption, getElectricalElementOption, getElectricalPlanArea, getPhotoPlanArea, getElementType, getElementSector, getPhotoProgressPercentage, getPipeNetworkOption, InspectionPhoto, InspectorProfile, isElectricalElementType, PlanArea } from '../types';
 import { compressImageForDevice } from '../services/deviceStorageService';
 import { isQuotaExceededError, loadBlueprintImage, restoreBlueprintFromSources, saveBlueprintImage } from '../services/blueprintStorageService';
 import { BlueprintRevision, getCloudBlueprintRevision, isSupabaseStorageUrl, uploadBlueprintToSupabase } from '../services/supabaseStorageService';
@@ -13,6 +13,7 @@ import { getCameraSelectionLabel } from '../lib/cameraSelectionLabel';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from './ui/breadcrumb';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog';
 import { BulkEditModal } from './BulkEditModal';
+import { BottomSheet } from './BottomSheet';
 import { getActaTheme } from '../services/obraAnalyticsService';
 
 interface MapViewProps {
@@ -235,6 +236,106 @@ const DEFAULT_PLAN_AREA_FILTERS: PlanAreaFilterState = {
 const isPlanFilter = (value: unknown): value is PlanFilter =>
   value === 'all' || value === 'camara' || value === 'caja' || value === 'tuberia' || value === 'pending' || value === 'not_started';
 
+export type SectorFilterOption = 'TODOS' | 'I1' | 'I2' | 'TRONCAL' | 'OTRO';
+
+const SECTOR_OPTIONS: Array<{
+  code: SectorFilterOption;
+  label: string;
+  shortLabel: string;
+  icon: string;
+  color: string;
+  badge: string;
+}> = [
+  { code: 'TODOS', label: 'Todos los sectores', shortLabel: 'TODOS', icon: 'grid_view', color: '#073f74', badge: 'bg-slate-100 text-slate-800' },
+  { code: 'I1', label: 'Intersección 1', shortLabel: 'SECTOR I1', icon: 'alt_route', color: '#1d4ed8', badge: 'bg-blue-100 text-blue-900 border-blue-200' },
+  { code: 'I2', label: 'Intersección 2', shortLabel: 'SECTOR I2', icon: 'fork_right', color: '#4338ca', badge: 'bg-indigo-100 text-indigo-900 border-indigo-200' },
+  { code: 'TRONCAL', label: 'Troncal Principal', shortLabel: 'TRONCAL', icon: 'straight', color: '#047857', badge: 'bg-emerald-100 text-emerald-900 border-emerald-200' },
+  { code: 'OTRO', label: 'Otros Sectores', shortLabel: 'OTROS', icon: 'more_horiz', color: '#475569', badge: 'bg-slate-100 text-slate-700 border-slate-200' },
+];
+
+/**
+ * Redimensiona y comprime una imagen localmente utilizando un elemento <canvas> oculto
+ * antes de renderizarla o enviarla a la base de datos (Supabase Storage).
+ * Convierte a formato WebP o JPEG con calidad al 80% (0.80).
+ */
+function compressImageWithHiddenCanvas(
+  file: File,
+  maxWidth = 2400,
+  maxHeight = 2400,
+  quality = 0.80
+): Promise<{ dataUrl: string; format: 'webp' | 'jpeg'; originalSize: number; compressedSize: number }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+
+        // Redimensionar proporcionalmente respetando dimensiones máximas
+        if (width > maxWidth || height > maxHeight) {
+          const ratio = Math.min(maxWidth / width, maxHeight / height);
+          width = Math.max(1, Math.round(width * ratio));
+          height = Math.max(1, Math.round(height * ratio));
+        }
+
+        // Crear elemento <canvas> oculto en memoria
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          const fallbackDataUrl = (event.target?.result as string) || '';
+          resolve({
+            dataUrl: fallbackDataUrl,
+            format: 'jpeg',
+            originalSize: file.size,
+            compressedSize: file.size,
+          });
+          return;
+        }
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Convertir a WebP al 80% de calidad
+        try {
+          const webpDataUrl = canvas.toDataURL('image/webp', quality);
+          if (webpDataUrl.startsWith('data:image/webp')) {
+            const approxBytes = Math.round((webpDataUrl.length - 'data:image/webp;base64,'.length) * 0.75);
+            resolve({
+              dataUrl: webpDataUrl,
+              format: 'webp',
+              originalSize: file.size,
+              compressedSize: approxBytes,
+            });
+            return;
+          }
+        } catch {
+          // Continuar con JPEG
+        }
+
+        // Fallback a JPEG al 80% de calidad
+        const jpegDataUrl = canvas.toDataURL('image/jpeg', quality);
+        const approxBytes = Math.round((jpegDataUrl.length - 'data:image/jpeg;base64,'.length) * 0.75);
+        resolve({
+          dataUrl: jpegDataUrl,
+          format: 'jpeg',
+          originalSize: file.size,
+          compressedSize: approxBytes,
+        });
+      };
+
+      img.onerror = () => reject(new Error('No se pudo decodificar el archivo de imagen.'));
+      img.src = event.target?.result as string;
+    };
+
+    reader.onerror = () => reject(new Error('Error al leer el archivo con FileReader.'));
+    reader.readAsDataURL(file);
+  });
+}
+
 const elementLabel = (photo: InspectionPhoto) => {
   const type = getElementType(photo);
   if (isElectricalPhoto(photo)) {
@@ -359,6 +460,8 @@ export const MapView: React.FC<MapViewProps> = ({
   // Modo de coloreado del plano: 'redes' (MT/BT/Datos estándar) o 'actas' (Codificación por Acta y Facturación)
   const [mapColorMode, setMapColorMode] = useState<'redes' | 'actas'>('redes');
   const [highlightActaFilter, setHighlightActaFilter] = useState<string | null>(null);
+  const [isLayersSheetOpen, setIsLayersSheetOpen] = useState(false);
+  const [selectedSector, setSelectedSector] = useState<SectorFilterOption>('TODOS');
   const [isActasMenuCollapsed, setIsActasMenuCollapsed] = useState<boolean>(() =>
     localStorage.getItem('photovault_actas_menu_collapsed') === 'true'
   );
@@ -662,6 +765,54 @@ export const MapView: React.FC<MapViewProps> = ({
     [photos],
   );
 
+  const elementCountBySector = useMemo(() => {
+    const counts: Record<SectorFilterOption, number> = {
+      TODOS: 0,
+      I1: 0,
+      I2: 0,
+      TRONCAL: 0,
+      OTRO: 0,
+    };
+    photos.forEach((photo) => {
+      const belongsToArea = selectedPlanArea === 'civil'
+        ? !isElectricalPhoto(photo)
+        : getPhotoPlanArea(photo) === selectedPlanArea;
+      if (belongsToArea) {
+        counts.TODOS++;
+        const s = getElementSector(photo.name).code as 'I1' | 'I2' | 'TRONCAL' | 'OTRO';
+        if (counts[s] !== undefined) {
+          counts[s]++;
+        } else {
+          counts.OTRO++;
+        }
+      }
+    });
+    return counts;
+  }, [photos, selectedPlanArea]);
+
+  const selectSectorAndFocus = (sectorCode: SectorFilterOption) => {
+    setSelectedSector(sectorCode);
+    if (sectorCode === 'TODOS') {
+      setPanOffset({ x: 0, y: 0 });
+      return;
+    }
+    const sectorPhotos = photos.filter((p) => {
+      const belongs = selectedPlanArea === 'civil' ? !isElectricalPhoto(p) : getPhotoPlanArea(p) === selectedPlanArea;
+      return belongs && isPlaced(p) && getElementSector(p.name).code === sectorCode;
+    });
+    if (sectorPhotos.length > 0) {
+      const xs = sectorPhotos.map((p) => p.planX ?? 50);
+      const ys = sectorPhotos.map((p) => p.planY ?? 50);
+      const avgX = xs.reduce((a, b) => a + b, 0) / xs.length;
+      const avgY = ys.reduce((a, b) => a + b, 0) / ys.length;
+
+      // Centrado suave en el punto medio de los elementos del sector
+      const targetPanX = ((50 - avgX) / 100) * 800 * planScale;
+      const targetPanY = ((50 - avgY) / 100) * 600 * planScale;
+      setPanOffset({ x: targetPanX, y: targetPanY });
+    }
+  };
+
   const visiblePhotos = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     return photos.filter((photo) => {
@@ -670,6 +821,10 @@ export const MapView: React.FC<MapViewProps> = ({
         ? !isElectricalPhoto(photo)
         : getPhotoPlanArea(photo) === selectedPlanArea;
       if (!belongsToArea) return false;
+      if (selectedSector !== 'TODOS') {
+        const sec = getElementSector(photo.name).code;
+        if (sec !== selectedSector) return false;
+      }
       if (activeFilter === 'pending' && !pendingPhotos.some((pending) => pending.id === photo.id)) return false;
       if (activeFilter === 'not_started' && !isNotStarted(photo)) return false;
       if (activeFilter !== 'all' && activeFilter !== 'pending' && activeFilter !== 'not_started' && type !== activeFilter) return false;
@@ -678,7 +833,7 @@ export const MapView: React.FC<MapViewProps> = ({
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(query));
     });
-  }, [activeFilter, pendingPhotos, photos, searchQuery, selectedPlanArea]);
+  }, [activeFilter, pendingPhotos, photos, searchQuery, selectedPlanArea, selectedSector]);
 
   const positionedPhotos = useMemo(
     () => visiblePhotos.filter((photo) => isPlaced(photo)),
@@ -1014,14 +1169,20 @@ export const MapView: React.FC<MapViewProps> = ({
   const handleBlueprintUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    if (!['image/jpeg', 'image/jpg'].includes(file.type)) {
-      setBlueprintStorageNotice('Carga un plano en formato JPG o JPEG.');
+    if (!['image/jpeg', 'image/jpg', 'image/webp', 'image/png'].includes(file.type) && !file.name.match(/\.(jpg|jpeg|webp|png)$/i)) {
+      setBlueprintStorageNotice('Carga un plano en formato JPG, JPEG o WebP.');
       return;
     }
 
-    setBlueprintStorageNotice('Optimizando el plano JPG…');
+    setBlueprintStorageNotice('Optimizando y comprimiendo con canvas oculto (80% calidad)...');
     try {
-      const optimizedImage = await compressImageForDevice(file, 2400, 1800, 0.86);
+      // Compresión local con <canvas> oculto en formato WebP o JPEG al 80% de calidad
+      const { dataUrl: optimizedImage, format, originalSize, compressedSize } = await compressImageWithHiddenCanvas(file, 2400, 2400, 0.80);
+      const origMb = (originalSize / (1024 * 1024)).toFixed(2);
+      const compMb = (compressedSize / (1024 * 1024)).toFixed(2);
+      const reduction = Math.max(0, Math.round((1 - compressedSize / originalSize) * 100));
+
+      // 1. Renderizar localmente en el visor antes o mientras se persiste
       setBlueprint((previous) => ({
         ...previous,
         name: file.name.replace(/\.[^/.]+$/, ''),
@@ -1031,6 +1192,10 @@ export const MapView: React.FC<MapViewProps> = ({
       }));
       setHasPendingPlanChanges(true);
       event.target.value = '';
+
+      setBlueprintStorageNotice(`Plano comprimido a ${format.toUpperCase()} 80% (${compMb} MB, -${reduction}%). Guardando...`);
+
+      // 2. Enviar a la base de datos (Supabase Storage)
       try {
         const remoteUrl = await uploadBlueprintToSupabase(optimizedImage, {
           id: inspector.id,
@@ -1045,13 +1210,13 @@ export const MapView: React.FC<MapViewProps> = ({
             version: uploadedAt,
           });
         }
-        setBlueprintStorageNotice('Plano JPG sincronizado con Supabase Storage y disponible para inspectores.');
+        setBlueprintStorageNotice(`Plano optimizado (${format.toUpperCase()} 80%) y sincronizado con Supabase Storage.`);
       } catch (error) {
-        setBlueprintStorageNotice('El plano quedó guardado en este dispositivo, pero no se pudo sincronizar con Supabase Storage.');
+        setBlueprintStorageNotice(`Plano optimizado localmente (${format.toUpperCase()} 80%), pero no se pudo sincronizar con Supabase Storage.`);
         console.warn('No se pudo cargar el plano a Supabase Storage:', error);
       }
     } catch {
-      setBlueprintStorageNotice('No se pudo procesar el JPG. Intenta con otro archivo de plano.');
+      setBlueprintStorageNotice('No se pudo procesar y comprimir la imagen del plano. Intenta con otro archivo.');
     }
   };
 
@@ -1530,13 +1695,14 @@ export const MapView: React.FC<MapViewProps> = ({
             <span className="material-symbols-outlined text-[17px]">upload_file</span>
             {blueprint.imageUrl ? 'Cambiar JPG' : 'Cargar JPG'}
           </button>}
-          {isAdmin && <input ref={fileInputRef} type="file" accept="image/jpeg,.jpg,.jpeg" onChange={handleBlueprintUpload} className="hidden" />}
+          {isAdmin && <input ref={fileInputRef} type="file" accept="image/jpeg,.jpg,.jpeg,image/webp,.webp" onChange={handleBlueprintUpload} className="hidden" />}
         </div>
       </header>
 
       <div className="relative z-20 shrink-0 overflow-x-auto border-b border-[#c7d7df] bg-[#f7fbfd]/95 px-4 py-2 shadow-sm">
       <div className="flex min-w-max items-center gap-2 pr-4">
-        <div className="mr-1 inline-flex items-center gap-1 rounded-lg border border-[#b9d0db] bg-white p-1 shadow-xs" aria-label="Acceso rápido a capas de obra" role="group">
+        {/* Acceso rápido a capas de obra (oculto en móvil < 768px por indicación, reemplazado por FAB "Capas") */}
+        <div className="mr-1 hidden md:inline-flex items-center gap-1 rounded-lg border border-[#b9d0db] bg-white p-1 shadow-xs" aria-label="Acceso rápido a capas de obra" role="group">
           <span className="px-1.5 font-mono text-[9px] font-bold tracking-[0.12em] text-[#66808d]">CAPAS</span>
           {QUICK_PLAN_AREAS.map((area) => {
             const details = PLAN_AREA_DETAILS[area];
@@ -1555,6 +1721,36 @@ export const MapView: React.FC<MapViewProps> = ({
                 {details.shortLabel}
                 <span className={`ml-0.5 inline-grid min-w-4 place-items-center rounded-full px-1 py-0.5 font-mono text-[9px] leading-none ${isActive ? 'bg-white/20 text-white' : 'bg-[#dbeaf1] text-[#315364]'}`} aria-label={`${elementCountByPlanArea[area]} elementos guardados`}>
                   {elementCountByPlanArea[area]}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <span className="hidden h-6 w-px bg-[#b8ced9] md:block" aria-hidden="true" />
+
+        {/* División del plano en Sectores para hacer más fluida la vista del mapa */}
+        <div className="hidden sm:inline-flex items-center gap-1 rounded-lg border border-[#b9d0db] bg-white p-1 shadow-xs" aria-label="Sectores del mapa" role="group">
+          <span className="px-1.5 font-mono text-[9px] font-bold tracking-[0.12em] text-[#66808d]">SECTOR</span>
+          {SECTOR_OPTIONS.map((sec) => {
+            const isSecActive = selectedSector === sec.code;
+            return (
+              <button
+                key={sec.code}
+                type="button"
+                onClick={() => selectSectorAndFocus(sec.code)}
+                className={`inline-flex h-7 items-center gap-1 rounded-md border px-2 text-[10px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0566aa] ${
+                  isSecActive
+                    ? 'bg-[#0b2940] text-white border-[#0b2940] shadow-xs'
+                    : 'border-transparent bg-[#f4f9fb] text-[#466473] hover:bg-[#e5f4fb]'
+                }`}
+                title={`Sector ${sec.label}: ${elementCountBySector[sec.code]} elementos`}
+              >
+                <span className="material-symbols-outlined text-[13px]">{sec.icon}</span>
+                <span>{sec.shortLabel}</span>
+                <span className={`ml-0.5 inline-grid min-w-4 place-items-center rounded-full px-1 py-0.5 font-mono text-[9px] leading-none ${
+                  isSecActive ? 'bg-white/20 text-white' : 'bg-[#dbeaf1] text-[#315364]'
+                }`}>
+                  {elementCountBySector[sec.code]}
                 </span>
               </button>
             );
@@ -1701,6 +1897,25 @@ export const MapView: React.FC<MapViewProps> = ({
       </div>
 
       <main className="relative min-h-0 flex-1 overflow-auto p-5">
+        {/* Banner flotante de sector activo para navegación fluida */}
+        {selectedSector !== 'TODOS' && (
+          <div className="pointer-events-auto absolute top-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 rounded-full border border-blue-200 bg-white/95 px-3 py-1.5 text-xs font-bold text-blue-950 shadow-lg backdrop-blur-xs">
+            <span className="flex h-2 w-2 rounded-full bg-blue-600 animate-pulse" />
+            <span>Sector activo: {SECTOR_OPTIONS.find((s) => s.code === selectedSector)?.label}</span>
+            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-mono font-bold text-blue-800">
+              {elementCountBySector[selectedSector]} elementos
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedSector('TODOS')}
+              className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800"
+              title="Restablecer a todos los sectores"
+            >
+              <span className="material-symbols-outlined text-[13px]">close</span>
+            </button>
+          </div>
+        )}
+
         {blueprintSyncPresentation.isLoading && (
           <div role="status" aria-live="polite" className="absolute inset-0 z-20 flex items-center justify-center bg-[#e7edf1]/80 backdrop-blur-[1px]">
             <div className="flex min-w-[250px] items-center gap-3 rounded-2xl border border-[#b6d4e4] bg-white/95 px-5 py-4 shadow-[0_16px_38px_rgba(7,63,116,0.16)]">
@@ -3122,6 +3337,149 @@ export const MapView: React.FC<MapViewProps> = ({
           exitMultipleSelection();
         }}
       />
+
+      {/* Botón flotante móvil para desplegar el BottomSheet de Capas y Sectores (< 768px) */}
+      <div className="fixed bottom-6 right-6 z-40 md:hidden">
+        <button
+          type="button"
+          onClick={() => setIsLayersSheetOpen(true)}
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-[#073f74] text-white shadow-2xl ring-4 ring-white/60 transition hover:bg-[#052c52] active:scale-95"
+          aria-label="Abrir capas de obra"
+          title="Capas y sectores de obra"
+        >
+          <span className="material-symbols-outlined text-[26px]">layers</span>
+        </button>
+      </div>
+
+      {/* BottomSheet de Capas y Sectores para móvil */}
+      <BottomSheet
+        isOpen={isLayersSheetOpen}
+        onClose={() => setIsLayersSheetOpen(false)}
+        title="Capas y Sectores de Obra"
+      >
+        <div className="space-y-5 pb-6">
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Capa Técnica Activa
+              </label>
+              <span className="text-[11px] text-slate-400">Selecciona para filtrar</span>
+            </div>
+            <div className="grid grid-cols-1 gap-2">
+              {QUICK_PLAN_AREAS.map((area) => {
+                const details = PLAN_AREA_DETAILS[area];
+                const isActive = selectedPlanArea === area;
+                return (
+                  <button
+                    key={area}
+                    type="button"
+                    onClick={() => {
+                      switchPlanArea(area);
+                      setIsLayersSheetOpen(false);
+                    }}
+                    className={`flex items-center justify-between rounded-xl border p-3 transition ${
+                      isActive
+                        ? 'border-transparent text-white shadow-sm'
+                        : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
+                    }`}
+                    style={isActive ? { backgroundColor: details.color } : undefined}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className="material-symbols-outlined text-[20px]">{details.icon}</span>
+                      <span className="text-sm font-semibold">{details.label}</span>
+                    </div>
+                    <span
+                      className={`rounded-full px-2 py-0.5 font-mono text-xs font-bold ${
+                        isActive ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                      }`}
+                    >
+                      {elementCountByPlanArea[area]}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Sector del Plano (Navegación Fluida)
+              </label>
+              {selectedSector !== 'TODOS' && (
+                <button
+                  type="button"
+                  onClick={() => selectSectorAndFocus('TODOS')}
+                  className="text-xs font-bold text-blue-600 hover:underline"
+                >
+                  Ver todos
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {SECTOR_OPTIONS.map((sec) => {
+                const isSecActive = selectedSector === sec.code;
+                return (
+                  <button
+                    key={sec.code}
+                    type="button"
+                    onClick={() => {
+                      selectSectorAndFocus(sec.code);
+                      setIsLayersSheetOpen(false);
+                    }}
+                    className={`flex items-center justify-between rounded-xl border p-2.5 text-xs font-bold transition ${
+                      isSecActive
+                        ? 'border-[#073f74] bg-[#073f74] text-white shadow-sm'
+                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 truncate">
+                      <span className="material-symbols-outlined text-[16px]">{sec.icon}</span>
+                      <span className="truncate">{sec.shortLabel}</span>
+                    </div>
+                    <span
+                      className={`ml-1 rounded-full px-1.5 py-0.5 font-mono text-[10px] ${
+                        isSecActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {elementCountBySector[sec.code]}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500">
+              Tipo de Elemento
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {(selectedPlanArea !== 'civil'
+                ? [['all', 'Todos', 'bolt'], ['not_started', 'No iniciado', 'schedule'], ['pending', 'Sin ubicar', 'location_off']]
+                : [['all', 'Todos', 'layers'], ['camara', 'Cámaras', 'videocam'], ['caja', 'Cajas', 'inventory_2'], ['tuberia', 'Tuberías', 'timeline'], ['not_started', 'No iniciado', 'schedule'], ['pending', 'Sin ubicar', 'location_off']]
+              ).map(([filter, label, icon]) => (
+                <button
+                  key={filter}
+                  type="button"
+                  onClick={() => {
+                    setActiveFilter(filter as PlanFilter);
+                    setIsLayersSheetOpen(false);
+                  }}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition ${
+                    activeFilter === filter
+                      ? 'border-[#0566aa] bg-[#e5f4fb] text-[#004d84]'
+                      : 'border-slate-200 bg-white text-slate-600'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[15px]">{icon}</span>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </BottomSheet>
     </section>
   );
 };

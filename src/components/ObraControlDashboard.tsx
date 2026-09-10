@@ -1,18 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-} from 'recharts';
-import {
   InspectionPhoto,
   InspectorProfile,
   getPhotoProgressPercentage,
@@ -22,6 +9,7 @@ import {
 import { calculateObraMetrics, getSectorLabel } from '../services/obraAnalyticsService';
 import { ObraBaselineContrastView } from './ObraBaselineContrastView';
 import { ObraActasSummaryView } from './ObraActasSummaryView';
+import { ObraStackedBarChart, ObraDonutChart } from './ObraCharts';
 
 interface ObraControlDashboardProps {
   photos: InspectionPhoto[];
@@ -562,48 +550,8 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
             </div>
           </div>
 
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={chartDataBarras}
-                margin={{ top: 10, right: 10, left: -20, bottom: 20 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis
-                  dataKey="area"
-                  tick={{ fontSize: 11, fill: '#475569', fontWeight: 600 }}
-                  axisLine={{ stroke: '#cbd5e1' }}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: '#475569' }}
-                  axisLine={{ stroke: '#cbd5e1' }}
-                  tickLine={false}
-                />
-                <Tooltip
-                  formatter={(value: any, name: any) => [
-                    `${value} elementos`,
-                    name === 'completado' ? 'Terminado' : name === 'enProceso' ? 'En Proceso' : 'Pendiente',
-                  ]}
-                  contentStyle={{
-                    backgroundColor: '#ffffff',
-                    borderRadius: '12px',
-                    border: '1px solid #cbd5e1',
-                    fontSize: '12px',
-                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                  }}
-                />
-                <Legend
-                  verticalAlign="top"
-                  align="right"
-                  iconType="circle"
-                  wrapperStyle={{ fontSize: '11px', paddingBottom: '10px' }}
-                />
-                <Bar dataKey="completado" name="Terminado" stackId="a" fill="#16a34a" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="enProceso" name="En Proceso" stackId="a" fill="#f59e0b" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="pendiente" name="Pendiente" stackId="a" fill="#94a3b8" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="w-full">
+            <ObraStackedBarChart data={chartDataBarras} />
           </div>
         </div>
 
@@ -622,42 +570,8 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
             <p className="text-xs text-[#64748b]">Estado físico actual y volumen de ítems</p>
           </div>
 
-          <div className="h-52 w-full flex items-center justify-center">
-            {chartDataDonut.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={chartDataDonut}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={75}
-                    paddingAngle={3}
-                    dataKey="value"
-                  >
-                    {chartDataDonut.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value: any, name: any) => [`${value} unidades`, name]}
-                    contentStyle={{
-                      backgroundColor: '#ffffff',
-                      borderRadius: '12px',
-                      border: '1px solid #cbd5e1',
-                      fontSize: '12px',
-                    }}
-                  />
-                  <Legend
-                    verticalAlign="bottom"
-                    iconType="circle"
-                    wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="text-center text-xs text-[#94a3b8]">No hay datos para la selección activa</div>
-            )}
+          <div className="w-full flex items-center justify-center my-2">
+            <ObraDonutChart data={chartDataDonut} />
           </div>
 
           {/* Micro Auditoría por Actas */}
