@@ -34,6 +34,7 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
   const [searchTableQuery, setSearchTableQuery] = useState<string>('');
   const [tableFilterType, setTableFilterType] = useState<'TODOS' | 'CAMARA' | 'TUBERIA'>('TODOS');
   const [dashboardTab, setDashboardTab] = useState<'RESUMEN' | 'CONTRASTE' | 'ACTAS'>('RESUMEN');
+  const [cameraCountCategoryTab, setCameraCountCategoryTab] = useState<'ALL' | 'TIPO' | 'SECTOR' | 'ACTA'>('ALL');
 
   // Cálculo de Métricas y Datasets
   const {
@@ -49,6 +50,43 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
   } = useMemo(() => {
     return calculateObraMetrics(photos, selectedArea, selectedActa, soloPendientes);
   }, [photos, selectedArea, selectedActa, soloPendientes]);
+
+  // Conteo Físico Real de Cámaras (sin ponderar por % de avance)
+  const rawCamaras = activeSectorMetric.conteoCamarasFisico;
+
+  const sumaTipos = useMemo(() => {
+    if (!rawCamaras?.porTipo) return 0;
+    return (rawCamaras.porTipo.mt?.total || 0) + (rawCamaras.porTipo.bt?.total || 0) + (rawCamaras.porTipo.datos?.total || 0);
+  }, [rawCamaras?.porTipo]);
+
+  const sectorEntries = useMemo(() => {
+    if (!rawCamaras?.porSector) return [];
+    const order = ['I1', 'I2', 'TRONCAL', 'OTRO'];
+    return Object.entries(rawCamaras.porSector).sort((a, b) => {
+      const ia = order.indexOf(a[0]);
+      const ib = order.indexOf(b[0]);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    });
+  }, [rawCamaras?.porSector]);
+
+  const sumaSectores = useMemo(() => {
+    if (!rawCamaras?.porSector) return 0;
+    return Object.values(rawCamaras.porSector).reduce((acc, curr) => acc + (curr.total || 0), 0);
+  }, [rawCamaras?.porSector]);
+
+  const actaEntries = useMemo(() => {
+    if (!rawCamaras?.porActa) return [];
+    return Object.entries(rawCamaras.porActa).sort((a, b) => {
+      if (a[0] === 'Sin Acta') return 1;
+      if (b[0] === 'Sin Acta') return -1;
+      return a[0].localeCompare(b[0], undefined, { numeric: true });
+    });
+  }, [rawCamaras?.porActa]);
+
+  const sumaActas = useMemo(() => {
+    if (!rawCamaras?.porActa) return 0;
+    return Object.values(rawCamaras.porActa).reduce((acc, curr) => acc + (curr.total || 0), 0);
+  }, [rawCamaras?.porActa]);
 
   // Filtrar la tabla de detalle según búsqueda y tipo de elemento
   const displayItems = useMemo(() => {
@@ -422,13 +460,250 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* Bloque Resumen de Conteo Físico Real de Cámaras (Sin Ponderar por % de Avance) */}
+            <div className="mt-4 rounded-xl border border-blue-200/80 bg-linear-to-b from-blue-50/40 via-white to-slate-50/50 p-3 sm:p-3.5 shadow-2xs">
+              {/* Encabezado del bloque de conteo */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-blue-100">
+                <div className="flex items-center gap-2">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-blue-600 text-white shadow-2xs">
+                    <span className="material-symbols-outlined text-[15px]">tag</span>
+                  </span>
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-bold text-slate-800 flex flex-wrap items-center gap-1.5 sm:gap-2">
+                      <span>Conteo Físico Real de Cámaras</span>
+                      <span className="text-[10px] font-semibold text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-full border border-blue-200 whitespace-nowrap">
+                        Sin ponderar por % de avance
+                      </span>
+                    </h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Unidades físicas reales en campo ({activeSectorMetric.sectorName})
+                    </p>
+                  </div>
+                </div>
+
+                {/* Selector de categoría para enfocar o ver todo */}
+                <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200 self-start sm:self-auto shadow-2xs">
+                  {[
+                    { id: 'ALL', label: 'Todas', icon: 'grid_view' },
+                    { id: 'TIPO', label: 'Por Tipo', icon: 'electric_bolt' },
+                    { id: 'SECTOR', label: 'Por Sector', icon: 'share_location' },
+                    { id: 'ACTA', label: 'Por Acta', icon: 'description' },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setCameraCountCategoryTab(tab.id as any)}
+                      className={`px-2 py-1 rounded-md text-[11px] font-bold flex items-center gap-1 transition cursor-pointer ${
+                        cameraCountCategoryTab === tab.id
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[13px]">{tab.icon}</span>
+                      <span>{tab.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Resumen Superior de Totales Físicos */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 my-2.5">
+                <div className="bg-white rounded-lg p-2 border border-slate-200/80 shadow-2xs">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Total Físico</span>
+                  <div className="flex items-baseline gap-1 mt-0.5">
+                    <span className="text-lg font-black text-slate-900">{rawCamaras?.totalFisico ?? 0}</span>
+                    <span className="text-[11px] text-slate-500 font-medium">unidades</span>
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg p-2 border border-emerald-200/80 shadow-2xs">
+                  <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">Terminadas (100%)</span>
+                  <div className="flex items-baseline gap-1 mt-0.5">
+                    <span className="text-lg font-black text-emerald-700">{rawCamaras?.terminadas ?? 0}</span>
+                    <span className="text-[11px] text-emerald-600 font-medium">un</span>
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg p-2 border border-amber-200/80 shadow-2xs">
+                  <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block">En Proceso</span>
+                  <div className="flex items-baseline gap-1 mt-0.5">
+                    <span className="text-lg font-black text-amber-700">{rawCamaras?.enProceso ?? 0}</span>
+                    <span className="text-[11px] text-amber-600 font-medium">un</span>
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg p-2 border border-slate-200/80 shadow-2xs">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">No Iniciadas</span>
+                  <div className="flex items-baseline gap-1 mt-0.5">
+                    <span className="text-lg font-black text-slate-600">{rawCamaras?.noIniciadas ?? 0}</span>
+                    <span className="text-[11px] text-slate-400 font-medium">un</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Grilla / Vistas de Sumas por Categoría */}
+              <div className={`grid gap-2.5 pt-1 ${
+                cameraCountCategoryTab === 'ALL'
+                  ? 'grid-cols-1 md:grid-cols-3'
+                  : 'grid-cols-1'
+              }`}>
+                {/* Categoría 1: Por Tipo (MT, BT, DATOS) */}
+                {(cameraCountCategoryTab === 'ALL' || cameraCountCategoryTab === 'TIPO') && (
+                  <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-2xs flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                        <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                          Suma por Tipo de Red
+                        </span>
+                        <span className="text-xs font-black px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200">
+                          Suma: {sumaTipos} un
+                        </span>
+                      </div>
+
+                      <div className="space-y-1.5 mt-2">
+                        {/* MT */}
+                        <div className="flex items-center justify-between text-xs bg-slate-50/80 p-2 rounded-lg border border-slate-100">
+                          <div>
+                            <span className="font-bold text-indigo-900 block">Media Tensión (MT)</span>
+                            <span className="text-[10px] text-slate-500">
+                              {rawCamaras?.porTipo.mt.terminadas ?? 0} term. · {rawCamaras?.porTipo.mt.enProceso ?? 0} proc.
+                            </span>
+                          </div>
+                          <span className="text-sm font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                            {rawCamaras?.porTipo.mt.total ?? 0} un
+                          </span>
+                        </div>
+
+                        {/* BT */}
+                        <div className="flex items-center justify-between text-xs bg-slate-50/80 p-2 rounded-lg border border-slate-100">
+                          <div>
+                            <span className="font-bold text-amber-900 block">Baja Tensión (BT)</span>
+                            <span className="text-[10px] text-slate-500">
+                              {rawCamaras?.porTipo.bt.terminadas ?? 0} term. · {rawCamaras?.porTipo.bt.enProceso ?? 0} proc.
+                            </span>
+                          </div>
+                          <span className="text-sm font-black text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-100">
+                            {rawCamaras?.porTipo.bt.total ?? 0} un
+                          </span>
+                        </div>
+
+                        {/* DATOS */}
+                        <div className="flex items-center justify-between text-xs bg-slate-50/80 p-2 rounded-lg border border-slate-100">
+                          <div>
+                            <span className="font-bold text-teal-900 block">DATOS / Control</span>
+                            <span className="text-[10px] text-slate-500">
+                              {rawCamaras?.porTipo.datos.terminadas ?? 0} term. · {rawCamaras?.porTipo.datos.enProceso ?? 0} proc.
+                            </span>
+                          </div>
+                          <span className="text-sm font-black text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-100">
+                            {rawCamaras?.porTipo.datos.total ?? 0} un
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-100 mt-2 flex items-center justify-between text-[11px] font-bold text-slate-700">
+                      <span>Total por Tipo:</span>
+                      <span className="text-blue-700 font-extrabold">{sumaTipos} unidades</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Categoría 2: Por Sector */}
+                {(cameraCountCategoryTab === 'ALL' || cameraCountCategoryTab === 'SECTOR') && (
+                  <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-2xs flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                        <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                          Suma por Sector
+                        </span>
+                        <span className="text-xs font-black px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200">
+                          Suma: {sumaSectores} un
+                        </span>
+                      </div>
+
+                      <div className="space-y-1.5 mt-2 max-h-[145px] overflow-y-auto pr-0.5">
+                        {sectorEntries.length === 0 ? (
+                          <div className="text-center py-4 text-xs text-slate-400">Sin cámaras en este sector</div>
+                        ) : (
+                          sectorEntries.map(([code, data]) => (
+                            <div key={code} className="flex items-center justify-between text-xs bg-slate-50/80 p-2 rounded-lg border border-slate-100">
+                              <div>
+                                <span className="font-bold text-slate-800 block">
+                                  {data.label} <span className="text-[10px] text-slate-400 font-normal">({code})</span>
+                                </span>
+                                <span className="text-[10px] text-slate-500">
+                                  {data.terminadas} term. · {data.enProceso} proc.
+                                </span>
+                              </div>
+                              <span className="text-sm font-black text-slate-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                                {data.total} un
+                              </span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-100 mt-2 flex items-center justify-between text-[11px] font-bold text-slate-700">
+                      <span>Total por Sector:</span>
+                      <span className="text-emerald-700 font-extrabold">{sumaSectores} unidades</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Categoría 3: Por Acta */}
+                {(cameraCountCategoryTab === 'ALL' || cameraCountCategoryTab === 'ACTA') && (
+                  <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-2xs flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                        <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-purple-600"></span>
+                          Suma por Acta
+                        </span>
+                        <span className="text-xs font-black px-2 py-0.5 rounded-md bg-purple-50 text-purple-800 border border-purple-200">
+                          Suma: {sumaActas} un
+                        </span>
+                      </div>
+
+                      <div className="space-y-1.5 mt-2 max-h-[145px] overflow-y-auto pr-0.5">
+                        {actaEntries.length === 0 ? (
+                          <div className="text-center py-4 text-xs text-slate-400">Sin actas con cámaras</div>
+                        ) : (
+                          actaEntries.map(([actaName, data]) => (
+                            <div key={actaName} className="flex items-center justify-between text-xs bg-slate-50/80 p-2 rounded-lg border border-slate-100">
+                              <div className="truncate mr-2">
+                                <span className="font-bold text-slate-800 block truncate">{actaName}</span>
+                                <span className="text-[10px] text-slate-500">
+                                  {data.terminadas} term. · {data.enProceso} proc.
+                                </span>
+                              </div>
+                              <span className="text-sm font-black text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-100 shrink-0">
+                                {data.total} un
+                              </span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-100 mt-2 flex items-center justify-between text-[11px] font-bold text-slate-700">
+                      <span>Total por Acta:</span>
+                      <span className="text-purple-700 font-extrabold">{sumaActas} unidades</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Barra de pie de tarjeta con relación y contraste oficial */}
           <div className="mt-4 pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-[#64748b]">
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-              <span>Ejecución Física Real: <strong className="text-[#0f172a] font-bold">{activeSectorMetric.camarasEjecutadas.toFixed(1)} un</strong></span>
+              <span>Ejecución Física Ponderada: <strong className="text-[#0f172a] font-bold">{activeSectorMetric.camarasEjecutadas.toFixed(1)} un</strong></span>
+              <span className="text-slate-300">|</span>
+              <span>Conteo Físico Real: <strong className="text-blue-700 font-bold">{rawCamaras?.totalFisico ?? activeSectorMetric.camarasIntervenidas} un</strong></span>
               <span className="text-slate-300">|</span>
               <span>Presupuesto Modelo: <strong className="text-[#0f172a] font-bold">{activeSectorMetric.camarasTotal} un</strong></span>
             </div>
@@ -489,10 +764,18 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
                   <div className="text-xl sm:text-2xl font-black text-teal-900 mt-1">
                     {activeSectorMetric.metrosEjecutados.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} <span className="text-sm font-normal">m</span>
                   </div>
-                  <div className="text-xs text-teal-700 mt-1">
-                    {activeSectorMetric.metrosMtEjecutados !== undefined && activeSectorMetric.metrosBtEjecutados !== undefined
-                      ? `${activeSectorMetric.metrosMtEjecutados.toFixed(1)}m MT + ${activeSectorMetric.metrosBtEjecutados.toFixed(1)}m BT`
-                      : 'Multiplicador × Distancia × %'}
+                  <div className="mt-1.5 space-y-1">
+                    <div className="flex flex-wrap items-center gap-1.5 font-bold text-xs">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded bg-teal-100/90 text-teal-900 border border-teal-200">
+                        4"... {((activeSectorMetric.metrosMtEjecutados || 0) + (activeSectorMetric.metrosDatosEjecutados || 0)).toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ml
+                      </span>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded bg-teal-100/90 text-teal-900 border border-teal-200">
+                        6"... {(activeSectorMetric.metrosBtEjecutados || 0).toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ml
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-teal-700">
+                      MT: {(activeSectorMetric.metrosMtEjecutados || 0).toFixed(1)}m · Datos: {(activeSectorMetric.metrosDatosEjecutados || 0).toFixed(1)}m · BT: {(activeSectorMetric.metrosBtEjecutados || 0).toFixed(1)}m
+                    </div>
                   </div>
                 </div>
                 <div className="text-[11px] text-teal-800/80 font-medium pt-2 border-t border-teal-200/60 mt-2">
@@ -507,8 +790,18 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
                   <div className="text-xl sm:text-2xl font-black text-slate-900 mt-1">
                     {activeSectorMetric.metrosTotales.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} <span className="text-sm font-normal">m</span>
                   </div>
-                  <div className="text-xs text-slate-600 mt-1">
-                    Pendientes: {activeSectorMetric.metrosPendientes.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} m
+                  <div className="mt-1.5 space-y-1">
+                    <div className="flex flex-wrap items-center gap-1.5 font-bold text-xs">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200">
+                        4"... {((activeSectorMetric.metrosMtBaseline || 0) + (activeSectorMetric.metrosDatosBaseline || 0)).toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ml
+                      </span>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200">
+                        6"... {(activeSectorMetric.metrosBtBaseline || 0).toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ml
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-600">
+                      Pendientes: {activeSectorMetric.metrosPendientes.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} m
+                    </div>
                   </div>
                 </div>
                 <div className="text-[11px] text-slate-500 font-medium pt-2 border-t border-slate-200/60 mt-2">
@@ -516,6 +809,49 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* Desglose de Metros Lineales por Tipo de Tubería */}
+            {activeSectorMetric.metrosPorTipoTuberia && activeSectorMetric.metrosPorTipoTuberia.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-slate-100">
+                <div className="text-[11px] font-bold text-[#475569] uppercase tracking-wider mb-2 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[15px] text-teal-700">tune</span>
+                    Metros Lineales por Tipo de Tubería
+                  </span>
+                  <span className="text-[10px] font-semibold text-teal-700">ml = metros lineales</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {activeSectorMetric.metrosPorTipoTuberia.map((tub) => (
+                    <div
+                      key={tub.diametro}
+                      className="bg-slate-50/80 hover:bg-slate-100/80 transition-colors border border-slate-200/90 rounded-xl p-2.5 flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-8 h-8 rounded-lg bg-teal-600 text-white flex items-center justify-center font-black text-xs shadow-2xs">
+                          {tub.diametro}
+                        </span>
+                        <div>
+                          <div className="text-xs font-bold text-[#0f172a] flex items-center gap-1.5">
+                            <span>{tub.label}...</span>
+                            <span className="text-teal-800 font-black">
+                              {tub.metrosEjecutados.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ml
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-[#64748b]">
+                            Línea Base: {tub.metrosPresupuestados.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ml · {tub.detalleRedes}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="inline-block px-1.5 py-0.5 rounded text-[11px] font-extrabold bg-teal-100 text-teal-900">
+                          {tub.avancePct}%
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="mt-4 pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-[#64748b]">

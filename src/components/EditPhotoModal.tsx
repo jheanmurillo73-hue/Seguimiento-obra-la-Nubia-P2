@@ -3,7 +3,7 @@
  * objeto seleccionado; una tubería nunca guarda datos de cámara, y viceversa.
  */
 import React, { useRef, useState } from 'react';
-import { CableGauge, CableType, CABLE_TYPE_OPTIONS, getCableTypeOption, getCableGaugeOptionsForPlanArea, InspectionPhoto, ExecutionStatus, CameraCode, CameraType, ElementType, ActaLabelPosition, getElectricalElementOption, getElectricalPlanArea, getElementType, getElementSector, getPipeNetworkOption, PIPE_NETWORK_OPTIONS, PipeConduit, PipeNetworkType, getDefaultPipeConfiguration, normalizeEvidenceTimeline, normalizePipeConduits, PlanArea, getConduitPresupuestadoMeters, getConduitEjecutadoMeters, isConduitEjecutado } from '../types';
+import { CableGauge, CableType, CABLE_TYPE_OPTIONS, getCableTypeOption, getCableGaugeOptionsForPlanArea, InspectionPhoto, ExecutionStatus, CameraCode, CameraType, ElementType, ActaLabelPosition, getElectricalElementOption, getElectricalPlanArea, getElementType, getElementSector, SectorCode, getPipeNetworkOption, PIPE_NETWORK_OPTIONS, PipeConduit, PipeNetworkType, getDefaultPipeConfiguration, normalizeEvidenceTimeline, normalizePipeConduits, PlanArea, getConduitPresupuestadoMeters, getConduitEjecutadoMeters, isConduitEjecutado } from '../types';
 import { WAREHOUSE_LOCATIONS, CAMERA_CODES, CAMERA_TYPES } from '../data/mockData';
 import { ACTA_ITEM_OPTIONS, getActaItemKey } from '../data/actaItems';
 import { compressEvidenceImageForUpload, formatImageBytes } from '../services/deviceStorageService';
@@ -56,6 +56,11 @@ export const EditPhotoModal: React.FC<EditPhotoModalProps> = ({
   onSave,
 }) => {
   const [name, setName] = useState(photo.name ?? '');
+  const [sectorCode, setSectorCode] = useState<SectorCode>(() => {
+    if (photo.sectorCode) return photo.sectorCode;
+    const initialSector = getElementSector(photo.name);
+    return initialSector.code;
+  });
   const [type, setType] = useState(photo.type ?? photo.categoryLabel ?? '');
   const [location, setLocation] = useState(photo.location ?? '');
   const [cameraCode, setCameraCode] = useState<CameraCode>(photo.cameraCode || 'SB850');
@@ -224,12 +229,18 @@ export const EditPhotoModal: React.FC<EditPhotoModalProps> = ({
     const savedPipeConduits = orderedPipeConduits;
     const primaryConduit = savedPipeConduits[0];
     const finalName = isAdmin ? name.trim() || photo.name : photo.name;
-    const sectorInfo = getElementSector(finalName);
+    const finalSectorCode = sectorCode;
+    const finalSectorLabel =
+      finalSectorCode === 'I1' ? 'Intersección 1' :
+      finalSectorCode === 'I2' ? 'Intersección 2' :
+      finalSectorCode === 'TRONCAL' ? 'Troncal Principal' :
+      'Otros Sectores';
+
     onSave({
       ...photo,
       name: finalName,
-      sector: sectorInfo.label,
-      sectorCode: sectorInfo.code,
+      sector: finalSectorLabel,
+      sectorCode: finalSectorCode,
       type: type.trim() || photo.type,
       location: location.trim() || photo.location,
       imageUrl: savedImageUrls[0] || photo.imageUrl,
@@ -351,21 +362,59 @@ export const EditPhotoModal: React.FC<EditPhotoModalProps> = ({
               className="w-full bg-[#f3faff] border border-[#c2c6d4] rounded-lg p-2.5 text-[14px] text-[#071e27] focus:border-[#004d99] focus:outline-none"
               required
             />
-            {(() => {
-              const liveSector = getElementSector(name || photo.name);
-              return (
-                <div className="mt-1.5 flex items-center gap-2 text-[12px]">
-                  <span className="text-[#555] font-medium">Sector asignado:</span>
-                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md font-bold border ${liveSector.badgeClass}`}>
-                    <span className="material-symbols-outlined text-[13px]">share_location</span>
-                    {liveSector.label} ({liveSector.code})
-                  </span>
-                  <span className="text-[11px] text-[#727783] italic">
-                    (Regla automática según nombre)
-                  </span>
-                </div>
-              );
-            })()}
+          </div>
+
+          {/* Sector de la Obra (Configuración Manual / Editable) */}
+          <div className="bg-[#f0f9ff] border border-[#b9e6fe] rounded-xl p-3">
+            <div className="flex items-center justify-between mb-2">
+              <label className="font-['Inter'] font-bold text-[13px] text-[#024a75] flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[17px] text-[#006699]">share_location</span>
+                Sector / Área de la Obra
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  const autoSec = getElementSector(name || photo.name);
+                  setSectorCode(autoSec.code);
+                }}
+                className="text-[11px] text-[#006699] hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+                title="Detectar automáticamente según el nombre del elemento"
+              >
+                <span className="material-symbols-outlined text-[13px]">auto_fix_high</span>
+                Detectar por nombre
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {[
+                { code: 'I1' as const, label: 'Intersección 1', short: 'I1', active: 'bg-blue-600 text-white border-blue-700 shadow-xs' },
+                { code: 'I2' as const, label: 'Intersección 2', short: 'I2', active: 'bg-indigo-600 text-white border-indigo-700 shadow-xs' },
+                { code: 'TRONCAL' as const, label: 'Troncal Principal', short: 'TRONCAL', active: 'bg-emerald-700 text-white border-emerald-800 shadow-xs' },
+                { code: 'OTRO' as const, label: 'Otros Sectores', short: 'OTRO', active: 'bg-slate-700 text-white border-slate-800 shadow-xs' },
+              ].map((s) => {
+                const isSelected = sectorCode === s.code;
+                return (
+                  <button
+                    key={s.code}
+                    type="button"
+                    onClick={() => setSectorCode(s.code)}
+                    className={`py-2 px-2 rounded-lg text-xs font-bold border text-center transition flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
+                      isSelected
+                        ? s.active
+                        : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="text-[12px] leading-tight">{s.label}</span>
+                    <span className={`text-[10px] ${isSelected ? 'text-white/80 font-normal' : 'text-slate-400 font-normal'}`}>
+                      ({s.short})
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-[11px] text-[#52798e]">
+              Sector asignado al elemento: <strong className="text-[#024a75] font-semibold">{sectorCode === 'I1' ? 'Intersección 1 (I1)' : sectorCode === 'I2' ? 'Intersección 2 (I2)' : sectorCode === 'TRONCAL' ? 'Troncal Principal (TRONCAL)' : 'Otros Sectores / General (OTRO)'}</strong>. Agrupa este elemento en el plano y los tableros de control.
+            </p>
           </div>
 
           <div className="rounded-xl border border-[#b7d5e4] bg-[#f8fbfd] p-3">

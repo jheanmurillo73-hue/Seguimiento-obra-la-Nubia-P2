@@ -64,10 +64,60 @@ export interface SectorMetric {
   metrosMtEjecutados?: number;
   metrosBtEjecutados?: number;
   metrosDatosEjecutados?: number;
+  metrosPorTipoTuberia?: PipeTypeBreakdown[];
+  conteoCamarasFisico?: CameraCountSummary;
 
   // Actas
   itemsPorActa: Record<string, number>;
   pendientesPorActa: Record<string, number>;
+}
+
+export interface CameraCountCategoryItem {
+  total: number;
+  terminadas: number;
+  enProceso: number;
+  noIniciadas: number;
+}
+
+export interface CameraCountSummary {
+  // Conteo Físico Total sin ponderar por % de avance
+  totalFisico: number;
+  terminadas: number;
+  enProceso: number;
+  noIniciadas: number;
+
+  // Sumas por Tipo de Red (MT, BT, DATOS)
+  porTipo: {
+    mt: CameraCountCategoryItem;
+    bt: CameraCountCategoryItem;
+    datos: CameraCountCategoryItem;
+  };
+
+  // Sumas por Sector de la Obra (I1, I2, TRONCAL, OTRO)
+  porSector: Record<string, CameraCountCategoryItem & {
+    key: string;
+    label: string;
+  }>;
+
+  // Sumas por Acta de Entrega / Liquidación
+  porActa: Record<string, CameraCountCategoryItem & {
+    acta: string;
+  }>;
+}
+
+export interface PipeTypeBreakdown {
+  diametro: string; // ej: '4"', '6"'
+  label: string; // ej: 'Tubería 4"'
+  metrosEjecutados: number;
+  metrosPresupuestados: number;
+  metrosPendientes: number;
+  avancePct: number;
+  detalleRedes?: string;
+  redesDetalle?: {
+    mt4?: number;
+    datos4?: number;
+    bt6?: number;
+  };
 }
 
 export interface BaselineCanalizacionSector {
@@ -554,6 +604,20 @@ export function calculateObraMetrics(
     metrosAvancePonderado: 0,
     distanciaTrazaTotal: 0,
     distanciaTrazaEjecutada: 0,
+    metrosPorTipoTuberia: [],
+    conteoCamarasFisico: {
+      totalFisico: 0,
+      terminadas: 0,
+      enProceso: 0,
+      noIniciadas: 0,
+      porTipo: {
+        mt: { total: 0, terminadas: 0, enProceso: 0, noIniciadas: 0 },
+        bt: { total: 0, terminadas: 0, enProceso: 0, noIniciadas: 0 },
+        datos: { total: 0, terminadas: 0, enProceso: 0, noIniciadas: 0 },
+      },
+      porSector: {},
+      porActa: {},
+    },
     itemsPorActa: {},
     pendientesPorActa: {},
   });
@@ -582,6 +646,68 @@ export function calculateObraMetrics(
       // Si es cámara
       if (item.isCamara) {
         s.camarasTotal++;
+
+        // Conteo Físico Real (sin ponderar por % de avance)
+        if (s.conteoCamarasFisico) {
+          s.conteoCamarasFisico.totalFisico++;
+          if (item.isTerminado) {
+            s.conteoCamarasFisico.terminadas++;
+          } else if (item.isEnProceso) {
+            s.conteoCamarasFisico.enProceso++;
+          } else {
+            s.conteoCamarasFisico.noIniciadas++;
+          }
+
+          // Por Tipo (MT, BT, DATOS)
+          const targetTipo = item.isDatos
+            ? s.conteoCamarasFisico.porTipo.datos
+            : item.isBT
+            ? s.conteoCamarasFisico.porTipo.bt
+            : s.conteoCamarasFisico.porTipo.mt;
+
+          targetTipo.total++;
+          if (item.isTerminado) targetTipo.terminadas++;
+          else if (item.isEnProceso) targetTipo.enProceso++;
+          else targetTipo.noIniciadas++;
+
+          // Por Sector
+          const secK = item.sectorKey || 'OTRO';
+          const secLabel = secK === 'I1' ? 'Intersección 1'
+            : secK === 'I2' ? 'Intersección 2'
+            : secK === 'TRONCAL' ? 'Troncal Principal'
+            : 'Otros Sectores';
+
+          if (!s.conteoCamarasFisico.porSector[secK]) {
+            s.conteoCamarasFisico.porSector[secK] = {
+              key: secK,
+              label: secLabel,
+              total: 0,
+              terminadas: 0,
+              enProceso: 0,
+              noIniciadas: 0,
+            };
+          }
+          s.conteoCamarasFisico.porSector[secK].total++;
+          if (item.isTerminado) s.conteoCamarasFisico.porSector[secK].terminadas++;
+          else if (item.isEnProceso) s.conteoCamarasFisico.porSector[secK].enProceso++;
+          else s.conteoCamarasFisico.porSector[secK].noIniciadas++;
+
+          // Por Acta
+          const actaK = item.acta || 'Sin Acta';
+          if (!s.conteoCamarasFisico.porActa[actaK]) {
+            s.conteoCamarasFisico.porActa[actaK] = {
+              acta: actaK,
+              total: 0,
+              terminadas: 0,
+              enProceso: 0,
+              noIniciadas: 0,
+            };
+          }
+          s.conteoCamarasFisico.porActa[actaK].total++;
+          if (item.isTerminado) s.conteoCamarasFisico.porActa[actaK].terminadas++;
+          else if (item.isEnProceso) s.conteoCamarasFisico.porActa[actaK].enProceso++;
+          else s.conteoCamarasFisico.porActa[actaK].noIniciadas++;
+        }
 
         // CRÍTICO: Si no está iniciado, la contribución es exactamente 0.
         // Si está terminado, 100%. Si está en proceso, progressPct (o 50 si no está especificado).
@@ -708,6 +834,48 @@ export function calculateObraMetrics(
     } else {
       s.distanciaTrazaEjecutada = Math.round(s.distanciaTrazaEjecutada * 10) / 10;
     }
+
+    // Desglose de Metros Lineales por Tipo / Calibre de Tubería (4", 6")
+    const mtEjec = s.metrosMtEjecutados || 0;
+    const datosEjec = s.metrosDatosEjecutados || 0;
+    const btEjec = s.metrosBtEjecutados || 0;
+
+    const mtPlan = s.metrosMtBaseline || 0;
+    const datosPlan = s.metrosDatosBaseline || 0;
+    const btPlan = s.metrosBtBaseline || 0;
+
+    const ejec4 = Math.round((mtEjec + datosEjec) * 10) / 10;
+    const plan4 = Math.round((mtPlan + datosPlan) * 10) / 10;
+    const pend4 = Math.max(0, Math.round((plan4 - ejec4) * 10) / 10);
+    const pct4 = plan4 > 0 ? Math.round((ejec4 / plan4) * 1000) / 10 : 0;
+
+    const ejec6 = Math.round(btEjec * 10) / 10;
+    const plan6 = Math.round(btPlan * 10) / 10;
+    const pend6 = Math.max(0, Math.round((plan6 - ejec6) * 10) / 10);
+    const pct6 = plan6 > 0 ? Math.round((ejec6 / plan6) * 1000) / 10 : 0;
+
+    s.metrosPorTipoTuberia = [
+      {
+        diametro: '4"',
+        label: 'Tubería 4"',
+        metrosEjecutados: ejec4,
+        metrosPresupuestados: plan4,
+        metrosPendientes: pend4,
+        avancePct: pct4,
+        detalleRedes: `${mtEjec.toFixed(1)} ml MT + ${datosEjec.toFixed(1)} ml Datos`,
+        redesDetalle: { mt4: mtEjec, datos4: datosEjec },
+      },
+      {
+        diametro: '6"',
+        label: 'Tubería 6"',
+        metrosEjecutados: ejec6,
+        metrosPresupuestados: plan6,
+        metrosPendientes: pend6,
+        avancePct: pct6,
+        detalleRedes: `${btEjec.toFixed(1)} ml BT`,
+        redesDetalle: { bt6: btEjec },
+      },
+    ];
 
     return s;
   };

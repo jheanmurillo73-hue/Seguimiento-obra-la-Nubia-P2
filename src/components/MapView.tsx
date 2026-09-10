@@ -779,7 +779,7 @@ export const MapView: React.FC<MapViewProps> = ({
         : getPhotoPlanArea(photo) === selectedPlanArea;
       if (belongsToArea) {
         counts.TODOS++;
-        const s = getElementSector(photo.name).code as 'I1' | 'I2' | 'TRONCAL' | 'OTRO';
+        const s = (photo.sectorCode || getElementSector(photo.name).code) as 'I1' | 'I2' | 'TRONCAL' | 'OTRO';
         if (counts[s] !== undefined) {
           counts[s]++;
         } else {
@@ -798,7 +798,7 @@ export const MapView: React.FC<MapViewProps> = ({
     }
     const sectorPhotos = photos.filter((p) => {
       const belongs = selectedPlanArea === 'civil' ? !isElectricalPhoto(p) : getPhotoPlanArea(p) === selectedPlanArea;
-      return belongs && isPlaced(p) && getElementSector(p.name).code === sectorCode;
+      return belongs && isPlaced(p) && (p.sectorCode || getElementSector(p.name).code) === sectorCode;
     });
     if (sectorPhotos.length > 0) {
       const xs = sectorPhotos.map((p) => p.planX ?? 50);
@@ -822,7 +822,7 @@ export const MapView: React.FC<MapViewProps> = ({
         : getPhotoPlanArea(photo) === selectedPlanArea;
       if (!belongsToArea) return false;
       if (selectedSector !== 'TODOS') {
-        const sec = getElementSector(photo.name).code;
+        const sec = photo.sectorCode || getElementSector(photo.name).code;
         if (sec !== selectedSector) return false;
       }
       if (activeFilter === 'pending' && !pendingPhotos.some((pending) => pending.id === photo.id)) return false;
