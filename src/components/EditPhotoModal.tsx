@@ -2,7 +2,7 @@
  * Diseño: cartografía técnica sobria. Las propiedades se acotan al tipo del
  * objeto seleccionado; una tubería nunca guarda datos de cámara, y viceversa.
  */
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useMemo } from 'react';
 import { CableGauge, CableType, CABLE_TYPE_OPTIONS, getCableTypeOption, getCableGaugeOptionsForPlanArea, InspectionPhoto, ExecutionStatus, CameraCode, CameraType, ElementType, ActaLabelPosition, getElectricalElementOption, getElectricalPlanArea, getElementType, getElementSector, SectorCode, getPipeNetworkOption, PIPE_NETWORK_OPTIONS, PipeConduit, PipeNetworkType, getDefaultPipeConfiguration, normalizeEvidenceTimeline, normalizePipeConduits, PlanArea, getConduitPresupuestadoMeters, getConduitEjecutadoMeters, isConduitEjecutado } from '../types';
 import { WAREHOUSE_LOCATIONS, CAMERA_CODES, CAMERA_TYPES } from '../data/mockData';
 import { ACTA_ITEM_OPTIONS, getActaItemKey } from '../data/actaItems';
@@ -10,6 +10,7 @@ import { compressEvidenceImageForUpload, formatImageBytes } from '../services/de
 import { getCameraTypeForCode } from '../lib/cameraCodeMapping';
 import { TramoSelector } from './TramoSelector';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
+import { ProjectScheduleService } from '../services/projectScheduleService';
 
 const ACTAS_STORAGE_KEY = 'photovault_actas_catalog';
 const DEFAULT_ACTAS = Array.from({ length: 10 }, (_, index) => `Acta ${index + 1}`);

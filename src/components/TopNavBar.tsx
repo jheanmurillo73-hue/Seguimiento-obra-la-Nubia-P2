@@ -43,6 +43,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
   const isGalleryActive = currentTab === 'dashboard' || currentTab === 'detail';
   const isMapActive = currentTab === 'map';
   const isDatabaseActive = currentTab === 'database';
+  const isScheduleActive = currentTab === 'schedule';
   const isHistoryActive = currentTab === 'history' || currentTab === 'collections';
   const isUploadActive = currentTab === 'upload';
   const isActivityActive = currentTab === 'activity';
@@ -71,6 +72,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
     { id: 'dashboard', label: 'Galería', isActive: isGalleryActive },
     { id: 'map', label: 'Plano', icon: 'map', isActive: isMapActive },
     { id: 'database', label: 'Base de Datos', icon: 'database', isActive: isDatabaseActive },
+    { id: 'schedule', label: 'Cronograma', icon: 'account_tree', isActive: isScheduleActive },
     { id: 'history', label: 'Historial', isActive: isHistoryActive },
     { id: 'upload', label: 'Subir', isActive: isUploadActive },
     { id: 'activity', label: 'Actividad', isActive: isActivityActive },

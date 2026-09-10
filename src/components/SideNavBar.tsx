@@ -47,6 +47,11 @@ export const SideNavBar: React.FC<SideNavBarProps> = ({
       icon: 'database',
     },
     {
+      id: 'schedule',
+      label: 'Cronograma Project',
+      icon: 'account_tree',
+    },
+    {
       id: 'upload',
       label: 'Subir Foto',
       icon: 'add_a_photo',

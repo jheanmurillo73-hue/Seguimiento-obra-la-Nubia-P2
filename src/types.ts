@@ -391,6 +391,7 @@ export type AppModule =
   | 'dashboard'
   | 'map'
   | 'database'
+  | 'schedule'
   | 'upload'
   | 'history'
   | 'activity'

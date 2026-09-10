@@ -10,6 +10,7 @@ export const MODULE_DEFINITIONS: Array<{ id: AppModule; label: string; icon: str
   { id: 'dashboard', label: 'Panel principal', icon: 'dashboard' },
   { id: 'map', label: 'Mapa de obra', icon: 'map' },
   { id: 'database', label: 'Base de datos', icon: 'database' },
+  { id: 'schedule', label: 'Cronograma Project', icon: 'account_tree' },
   { id: 'upload', label: 'Subir elemento', icon: 'add_a_photo' },
   { id: 'history', label: 'Historial', icon: 'history' },
   { id: 'activity', label: 'Actividad', icon: 'monitoring' },
@@ -17,7 +18,7 @@ export const MODULE_DEFINITIONS: Array<{ id: AppModule; label: string; icon: str
 ];
 
 export const ALL_OPERATIONAL_MODULES = MODULE_DEFINITIONS.map((module) => module.id);
-export const DEFAULT_INSPECTOR_MODULES: AppModule[] = ['dashboard', 'map', 'history'];
+export const DEFAULT_INSPECTOR_MODULES: AppModule[] = ['dashboard', 'map', 'database', 'schedule', 'history'];
 
 export const isPrimaryAdmin = (email?: string) =>
   email?.trim().toLowerCase() === PRIMARY_ADMIN_EMAIL;

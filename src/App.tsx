@@ -62,6 +62,7 @@ import {
 } from './lib/elementProgressStorage';
 import { Footer } from './components/Footer';
 import { Toast } from './components/Toast';
+import { ProjectScheduleView } from './components/ProjectScheduleView';
 
 const normalizeSettings = (candidate?: Partial<AppSettings> | null): AppSettings => ({
   emailNotifications: candidate?.emailNotifications ?? INITIAL_SETTINGS.emailNotifications,
@@ -953,6 +954,18 @@ export default function App() {
                 onEditPhoto={(photo) => setEditingPhoto(photo)}
                 onDeletePhoto={handleDeletePhoto}
                 onUpdatePhoto={handleUpdatePhoto}
+              />
+            ) : currentTab === 'schedule' ? (
+              <ProjectScheduleView
+                photos={photos}
+                onNavigateToMapWithPhoto={(photo) => {
+                  setSelectedPhotoId(photo.id);
+                  handleTabChange('map');
+                }}
+                onOpenPhotoDetail={(photoId) => {
+                  setSelectedPhotoId(photoId);
+                  handleTabChange('detail');
+                }}
               />
             ) : currentTab === 'upload' ? (
               <UploadPhotoView
