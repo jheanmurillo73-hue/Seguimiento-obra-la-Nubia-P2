@@ -537,7 +537,8 @@ export const resolvePhotoNetworkType = (photo: InspectionPhoto): 'MT' | 'BT' | '
 // Helper: determinar si un elemento es civil (canalización, caja, cámara)
 export const isCivilElement = (photo: InspectionPhoto): boolean => {
   // Excluir elementos exclusivamente eléctricos (transformadores, postes, tableros puros) si no son cajas/ductos
-  if (photo.planArea === 'electrico' && photo.elementType !== 'camara' && photo.elementType !== 'tuberia' && photo.elementType !== 'caja') {
+  const isElectricalArea = photo.planArea === 'electrical' || photo.planArea === 'electrical_mt' || photo.planArea === 'electrical_bt' || photo.planArea === 'electrical_lighting';
+  if ((isElectricalArea || photo.elementType === 'electrico') && photo.elementType !== 'camara' && photo.elementType !== 'tuberia' && photo.elementType !== 'caja') {
     return false;
   }
   return (

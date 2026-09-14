@@ -80,22 +80,13 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
 
   return (
     <>
-      <header className="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-2.5 sm:px-6 h-16 bg-[#f3faff] border-b border-[#c2c6d4] shadow-xs max-w-full overflow-hidden">
-        {/* Left: Brand & Mobile Menu button */}
+      <header className="fixed top-0 left-0 w-full z-40 flex items-center justify-between pl-14 sm:pl-16 md:pl-6 pr-2.5 sm:pr-6 h-16 bg-[#f3faff] border-b border-[#c2c6d4] shadow-xs max-w-full overflow-hidden">
+        {/* Left: Brand (Responsive padding accommodates the floating hamburger button on mobile) */}
         <div className="flex items-center gap-1.5 sm:gap-3 md:gap-6 min-w-0">
           <button
             type="button"
-            onClick={onToggleMobileMenu}
-            className="md:hidden w-10 h-10 shrink-0 flex items-center justify-center text-[#004d99] bg-[#e6f6ff] hover:bg-[#cfe6f2] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#004d99] transition-colors"
-            aria-label="Abrir menú de navegación"
-          >
-            <span className="material-symbols-outlined text-[22px] sm:text-[26px]">menu</span>
-          </button>
-
-          <button
-            type="button"
             onClick={() => onTabChange('dashboard')}
-            className="text-left font-['Hanken_Grotesk'] text-sm sm:text-2xl font-black text-[#004d99] hover:opacity-90 transition-opacity tracking-tight flex items-center gap-1 sm:gap-2 truncate min-w-0"
+            className="text-left font-['Hanken_Grotesk'] text-sm sm:text-2xl font-black text-[#004d99] hover:opacity-90 transition-opacity tracking-tight flex items-center gap-1 sm:gap-2 truncate min-w-0 cursor-pointer"
           >
             <span className="truncate">TRACKING LA NUBIA</span>
           </button>

@@ -183,32 +183,44 @@ export const SideNavBar: React.FC<SideNavBarProps> = ({
     </div>
   );
 
+  // Cerrar el drawer móvil con la tecla Escape
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isMobileOpen) {
+        onCloseMobile();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isMobileOpen, onCloseMobile]);
+
   return (
     <>
-      {/* Botón flotante de menú hamburguesa en la esquina superior izquierda en móvil (< 768px) */}
+      {/* Botón flotante de menú hamburguesa en la esquina superior izquierda en pantallas < 768px (Mobile) */}
       {!isMobileOpen && onOpenMobile && (
         <button
           type="button"
           onClick={onOpenMobile}
-          className="fixed top-3 left-3 z-50 md:hidden flex items-center justify-center w-10 h-10 rounded-xl bg-[#004d99] text-white shadow-lg hover:bg-[#003d7a] active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#004d99]"
-          aria-label="Abrir menú de navegación"
-          title="Abrir menú principal"
+          className="fixed top-2.5 left-2.5 sm:top-3 sm:left-3 z-50 md:hidden flex items-center justify-center w-11 h-11 rounded-xl bg-[#004d99] text-white shadow-lg shadow-blue-900/30 hover:bg-[#003d7a] active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#004d99] cursor-pointer"
+          aria-label="Abrir menú lateral (Panel Principal, Plano de Obra, etc.)"
+          title="Menú lateral: Panel Principal, Plano de Obra, etc."
         >
           <span className="material-symbols-outlined text-[24px]">menu</span>
         </button>
       )}
 
-      {/* Desktop Fixed SideNav */}
+      {/* Desktop Fixed SideNav: visible a partir de 768px (md:flex), oculto en mobile */}
       <aside className="hidden md:flex fixed left-0 top-16 h-[calc(100vh-64px)] w-64 bg-[#e6f6ff] border-r border-[#c2c6d4] z-40 flex-col">
         {navContent}
       </aside>
 
-      {/* Mobile Drawer Backdrop & Menu */}
+      {/* Mobile Drawer Backdrop & Menu: se despliega al presionar el botón hamburguesa */}
       {isMobileOpen && (
         <div className="fixed inset-0 z-50 md:hidden flex">
           <div
-            className="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity"
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity"
             onClick={onCloseMobile}
+            aria-hidden="true"
           />
           <div className="relative w-[82vw] max-w-xs h-full bg-[#e6f6ff] border-r border-[#c2c6d4] shadow-2xl flex flex-col z-10 animate-in slide-in-from-left duration-200">
             <div className="flex items-center justify-between p-4 border-b border-[#c2c6d4] bg-[#f3faff]">
@@ -217,14 +229,15 @@ export const SideNavBar: React.FC<SideNavBarProps> = ({
                   TRACKING LA NUBIA
                 </div>
                 <div className="text-[11px] text-slate-500 font-semibold">
-                  PhotoVault Pro Mobile
+                  Menú Lateral de Navegación
                 </div>
               </div>
               <button
                 type="button"
                 onClick={onCloseMobile}
-                className="w-11 h-11 flex items-center justify-center rounded-xl text-[#424752] hover:text-[#ba1a1a] hover:bg-white/80 transition-colors"
+                className="w-11 h-11 flex items-center justify-center rounded-xl text-[#424752] hover:text-[#ba1a1a] hover:bg-white/80 transition-colors cursor-pointer"
                 aria-label="Cerrar menú"
+                title="Cerrar menú lateral"
               >
                 <span className="material-symbols-outlined text-[24px]">close</span>
               </button>

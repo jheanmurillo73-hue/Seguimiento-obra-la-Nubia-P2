@@ -79,6 +79,15 @@ export interface CameraCountCategoryItem {
   noIniciadas: number;
 }
 
+export interface SectorTipoMatrixItem {
+  key: string;
+  label: string;
+  mt: CameraCountCategoryItem;
+  bt: CameraCountCategoryItem;
+  datos: CameraCountCategoryItem;
+  totalSector: CameraCountCategoryItem;
+}
+
 export interface CameraCountSummary {
   // Conteo Físico Total sin ponderar por % de avance
   totalFisico: number;
@@ -103,6 +112,19 @@ export interface CameraCountSummary {
   porActa: Record<string, CameraCountCategoryItem & {
     acta: string;
   }>;
+
+  // Matriz cruzada Sector × Tipo (Terminadas, En Proceso, No Iniciadas, Total)
+  matrizSectorTipo: Record<string, SectorTipoMatrixItem>;
+}
+
+export interface ObraFilterOptions {
+  selectedSectors?: string[]; // Array de 'I1' | 'I2' | 'TRONCAL' | 'OTRO' o ['TODOS']
+  selectedTypes?: ('MT' | 'BT' | 'DATOS')[]; // Array de tipos de red
+  selectedActas?: string[]; // Array de actas o ['TODAS']
+  statusFilter?: 'TODOS' | 'TERMINADAS' | 'EN_PROCESO' | 'CON_AVANCE' | 'NO_INICIADAS' | 'PENDIENTES';
+  logicalOperator?: 'AND' | 'OR'; // 'AND' = coincidir con todas las dimensiones; 'OR' = coincidir con cualquiera (inclusivo)
+  filterMode?: 'INCLUSIVE' | 'EXCLUSIVE'; // 'INCLUSIVE' = mostrar coincidencias; 'EXCLUSIVE' = excluir/omitir coincidencias
+  soloPendientes?: boolean;
 }
 
 export interface PipeTypeBreakdown {
@@ -467,7 +489,8 @@ export function calculateObraMetrics(
   photos: InspectionPhoto[],
   filterArea: 'TODOS' | 'I1' | 'I2' | 'TRONCAL' | 'OTRO' = 'TODOS',
   filterActa: string = 'TODAS',
-  soloPendientes: boolean = false
+  soloPendientes: boolean = false,
+  advancedOptions?: ObraFilterOptions
 ): {
   activeSectorMetric: SectorMetric;
   globalMetrics: ObraGlobalMetrics;
@@ -617,6 +640,40 @@ export function calculateObraMetrics(
       },
       porSector: {},
       porActa: {},
+      matrizSectorTipo: {
+        I1: {
+          key: 'I1',
+          label: 'Intersección 1',
+          mt: { total: 0, terminadas: 0, enProceso: 0, noIniciadas: 0 },
+          bt: { total: 0, terminadas: 0, enProceso: 0, noIniciadas: 0 },
+          datos: { total: 0, terminadas: 0, enProceso: 0, noIniciadas: 0 },
+          totalSector: { total: 0, terminadas: 0, enProceso: 0, noIniciadas: 0 },
+        },
+        I2: {
+          key: 'I2',
+          label: 'Intersección 2',
+          mt: { total: 0, terminadas: 0, enProceso: 0, noIniciadas: 0 },
+          bt: { total: 0, terminadas: 0, enProceso: 0, noIniciadas: 0 },
+          datos: { total: 0, terminadas: 0, enProceso: 0, noIniciadas: 0 },
+          totalSector: { total: 0, terminadas: 0, enProceso: 0, noIniciadas: 0 },
+        },
+        TRONCAL: {
+          key: 'TRONCAL',
+          label: 'Troncal Principal',
+          mt: { total: 0, terminadas: 0, enProceso: 0, noIniciadas: 0 },
+          bt: { total: 0, terminadas: 0, enProceso: 0, noIniciadas: 0 },
+          datos: { total: 0, terminadas: 0, enProceso: 0, noIniciadas: 0 },
+          totalSector: { total: 0, terminadas: 0, enProceso: 0, noIniciadas: 0 },
+        },
+        OTRO: {
+          key: 'OTRO',
+          label: 'Otros Sectores',
+          mt: { total: 0, terminadas: 0, enProceso: 0, noIniciadas: 0 },
+          bt: { total: 0, terminadas: 0, enProceso: 0, noIniciadas: 0 },
+          datos: { total: 0, terminadas: 0, enProceso: 0, noIniciadas: 0 },
+          totalSector: { total: 0, terminadas: 0, enProceso: 0, noIniciadas: 0 },
+        },
+      },
     },
     itemsPorActa: {},
     pendientesPorActa: {},
@@ -707,6 +764,26 @@ export function calculateObraMetrics(
           if (item.isTerminado) s.conteoCamarasFisico.porActa[actaK].terminadas++;
           else if (item.isEnProceso) s.conteoCamarasFisico.porActa[actaK].enProceso++;
           else s.conteoCamarasFisico.porActa[actaK].noIniciadas++;
+
+          // Matriz Cruzada Sector × Tipo
+          if (s.conteoCamarasFisico.matrizSectorTipo) {
+            const matrixSec = s.conteoCamarasFisico.matrizSectorTipo[secK] || s.conteoCamarasFisico.matrizSectorTipo.OTRO;
+            if (matrixSec) {
+              const targetCell = item.isDatos ? matrixSec.datos : item.isBT ? matrixSec.bt : matrixSec.mt;
+              targetCell.total++;
+              matrixSec.totalSector.total++;
+              if (item.isTerminado) {
+                targetCell.terminadas++;
+                matrixSec.totalSector.terminadas++;
+              } else if (item.isEnProceso) {
+                targetCell.enProceso++;
+                matrixSec.totalSector.enProceso++;
+              } else {
+                targetCell.noIniciadas++;
+                matrixSec.totalSector.noIniciadas++;
+              }
+            }
+          }
         }
 
         // CRÍTICO: Si no está iniciado, la contribución es exactamente 0.
@@ -890,21 +967,126 @@ export function calculateObraMetrics(
 
   const globalSector = buildMetricForItems(allParsed, 'TODOS');
 
-  // Métrica activa dinamizada por los segmentadores (Área + Acta + Pendientes)
+  // Métrica activa dinamizada por los segmentadores (Área/Sector + Tipo + Acta + Estado + Operador Y/O + Modo Inclusivo/Exclusivo)
   const activeItems = allParsed.filter((item) => {
+    if (advancedOptions) {
+      const {
+        selectedSectors = [],
+        selectedTypes = [],
+        selectedActas = [],
+        statusFilter = 'TODOS',
+        logicalOperator = 'AND',
+        filterMode = 'INCLUSIVE',
+      } = advancedOptions;
+
+      const hasSectorFilter = selectedSectors.length > 0 && !selectedSectors.includes('TODOS');
+      const hasTypeFilter = selectedTypes.length > 0 && selectedTypes.length < 3;
+      const hasActaFilter = selectedActas.length > 0 && !selectedActas.includes('TODAS');
+      const effectiveStatus = advancedOptions.soloPendientes ? 'PENDIENTES' : statusFilter;
+      const hasStatusFilter = effectiveStatus !== 'TODOS';
+
+      // Coincidencias individuales por dimensión
+      const matchSector = hasSectorFilter ? selectedSectors.includes(item.sectorKey) : true;
+      const matchType = hasTypeFilter
+        ? (item.isMT && selectedTypes.includes('MT')) ||
+          (item.isBT && selectedTypes.includes('BT')) ||
+          (item.isDatos && selectedTypes.includes('DATOS'))
+        : true;
+      const matchActa = hasActaFilter ? selectedActas.includes(item.acta) : true;
+
+      // Coincidencia de Estado / Avance
+      let matchStatus = true;
+      if (effectiveStatus === 'TERMINADAS') matchStatus = item.isTerminado;
+      else if (effectiveStatus === 'EN_PROCESO') matchStatus = item.isEnProceso;
+      else if (effectiveStatus === 'CON_AVANCE') matchStatus = item.isTerminado || item.isEnProceso;
+      else if (effectiveStatus === 'NO_INICIADAS') matchStatus = item.isNoIniciado;
+      else if (effectiveStatus === 'PENDIENTES') matchStatus = item.hasPendiente;
+
+      let dimensionMatch = true;
+      const anyDimensionActive = hasSectorFilter || hasTypeFilter || hasActaFilter;
+
+      if (logicalOperator === 'OR') {
+        // En modo OR (Filtro Inclusivo): basta con que el elemento coincida con CUALQUIERA de las dimensiones seleccionadas
+        if (anyDimensionActive) {
+          const condSector = hasSectorFilter && selectedSectors.includes(item.sectorKey);
+          const condType = hasTypeFilter && (
+            (item.isMT && selectedTypes.includes('MT')) ||
+            (item.isBT && selectedTypes.includes('BT')) ||
+            (item.isDatos && selectedTypes.includes('DATOS'))
+          );
+          const condActa = hasActaFilter && selectedActas.includes(item.acta);
+          dimensionMatch = Boolean(condSector || condType || condActa);
+        } else {
+          dimensionMatch = true;
+        }
+      } else {
+        // En modo AND (Intersección): debe coincidir con todas las dimensiones activas
+        dimensionMatch = matchSector && matchType && matchActa;
+      }
+
+      let passes = dimensionMatch && matchStatus;
+
+      // En modo exclusivo (omitir seleccionados), se invierte la coincidencia de las dimensiones
+      if (filterMode === 'EXCLUSIVE' && anyDimensionActive) {
+        passes = !dimensionMatch && matchStatus;
+      }
+
+      return passes;
+    }
+
+    // Fallback retrocompatible si no se proporcionan advancedOptions
     if (filterArea !== 'TODOS' && item.sectorKey !== filterArea) return false;
     if (filterActa !== 'TODAS' && item.acta !== filterActa) return false;
     if (soloPendientes && !item.hasPendiente) return false;
     return true;
   });
 
-  const activeLabel =
-    getSectorLabel(filterArea) +
-    (filterActa !== 'TODAS' ? ` · ${filterActa}` : '') +
-    (soloPendientes ? ' (Solo Pendientes)' : '');
+  let activeLabel = '';
+  if (advancedOptions) {
+    const parts: string[] = [];
+    if (advancedOptions.selectedSectors && advancedOptions.selectedSectors.length > 0 && !advancedOptions.selectedSectors.includes('TODOS')) {
+      parts.push(`Sectores: ${advancedOptions.selectedSectors.map((s) => getSectorLabel(s as any)).join(', ')}`);
+    } else {
+      parts.push(getSectorLabel(filterArea));
+    }
+    if (advancedOptions.selectedTypes && advancedOptions.selectedTypes.length > 0 && advancedOptions.selectedTypes.length < 3) {
+      parts.push(`Tipos: ${advancedOptions.selectedTypes.join(', ')}`);
+    }
+    if (advancedOptions.selectedActas && advancedOptions.selectedActas.length > 0 && !advancedOptions.selectedActas.includes('TODAS')) {
+      parts.push(`Actas: ${advancedOptions.selectedActas.join(', ')}`);
+    }
+    if (advancedOptions.statusFilter && advancedOptions.statusFilter !== 'TODOS') {
+      const statusLabels: Record<string, string> = {
+        TERMINADAS: 'Terminadas (100%)',
+        EN_PROCESO: 'En Proceso',
+        CON_AVANCE: 'Con Avance',
+        NO_INICIADAS: 'No Iniciadas',
+        PENDIENTES: 'Solo Pendientes',
+      };
+      parts.push(statusLabels[advancedOptions.statusFilter] || advancedOptions.statusFilter);
+    } else if (soloPendientes) {
+      parts.push('Solo Pendientes');
+    }
+    const opTxt = advancedOptions.logicalOperator === 'OR' ? 'Operador: O (Inclusivo)' : 'Operador: Y (Intersección)';
+    const modeTxt = advancedOptions.filterMode === 'EXCLUSIVE' ? ' [Exclusivo]' : '';
+    activeLabel = parts.join(' · ') + (parts.length > 1 ? ` (${opTxt}${modeTxt})` : '');
+  } else {
+    activeLabel =
+      getSectorLabel(filterArea) +
+      (filterActa !== 'TODAS' ? ` · ${filterActa}` : '') +
+      (soloPendientes ? ' (Solo Pendientes)' : '');
+  }
 
-  const isActaFiltered = filterActa !== 'TODAS';
-  const activeSectorMetric = buildMetricForItems(activeItems, filterArea, activeLabel, isActaFiltered);
+  const isActaFiltered = advancedOptions
+    ? Boolean(advancedOptions.selectedActas && advancedOptions.selectedActas.length > 0 && !advancedOptions.selectedActas.includes('TODAS'))
+    : filterActa !== 'TODAS';
+
+  const effectiveSectorKey: 'TODOS' | 'I1' | 'I2' | 'TRONCAL' | 'OTRO' =
+    advancedOptions?.selectedSectors && advancedOptions.selectedSectors.length === 1 && advancedOptions.selectedSectors[0] !== 'TODOS'
+      ? (advancedOptions.selectedSectors[0] as any)
+      : filterArea;
+
+  const activeSectorMetric = buildMetricForItems(activeItems, effectiveSectorKey, activeLabel, isActaFiltered);
 
   // Filtrar elementos para la tabla y gráficos de detalle
   const filteredItems = activeItems.map((item) => item.photo);
