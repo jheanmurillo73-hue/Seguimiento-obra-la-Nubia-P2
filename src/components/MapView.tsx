@@ -3,7 +3,7 @@
  * completo al área disponible y las ubicaciones se expresan como porcentajes
  * relativos al plano, nunca como coordenadas de un proveedor cartográfico.
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActaLabelPosition, BlueprintCalibration, BlueprintOverlay, ElectricalElementType, ELECTRICAL_ELEMENT_OPTIONS, getCableTypeOption, getElectricalElementOption, getElectricalPlanArea, getPhotoPlanArea, getElementType, getElementSector, getPhotoProgressPercentage, getPipeNetworkOption, InspectionPhoto, InspectorProfile, isElectricalElementType, PlanArea } from '../types';
 import { compressImageForDevice } from '../services/deviceStorageService';
 import { isQuotaExceededError, loadBlueprintImage, restoreBlueprintFromSources, saveBlueprintImage } from '../services/blueprintStorageService';
@@ -459,7 +459,64 @@ export const MapView: React.FC<MapViewProps> = ({
   );
   // Modo de coloreado del plano: 'redes' (MT/BT/Datos estándar) o 'actas' (Codificación por Acta y Facturación)
   const [mapColorMode, setMapColorMode] = useState<'redes' | 'actas'>('redes');
-  const [highlightActaFilter, setHighlightActaFilter] = useState<string | null>(null);
+  const [selectedActasFilter, setSelectedActasFilter] = useState<string[]>([]);
+
+  const isPhotoMatchingActaFilter = useCallback((photo: InspectionPhoto, filters: string[]) => {
+    if (!filters || filters.length === 0) return true;
+    const pActa = (photo.acta || '').trim();
+    const isPending = !pActa || pActa.toLowerCase().includes('sin acta');
+    if (isPending) {
+      return filters.includes('Sin Acta');
+    }
+    return filters.includes(pActa) || filters.some((f) => f.toLowerCase() === pActa.toLowerCase());
+  }, []);
+
+  const availableActas = useMemo(() => {
+    const baseActas = [
+      { key: 'Acta 1', label: 'Acta 1', estado: 'Facturado', color: '#2563eb', bg: '#eff6ff', border: '#3b82f6', text: '#1d4ed8', dashed: false },
+      { key: 'Acta 2', label: 'Acta 2', estado: 'Facturado', color: '#059669', bg: '#ecfdf5', border: '#10b981', text: '#047857', dashed: false },
+      { key: 'Acta 3', label: 'Acta 3', estado: 'En Revisión', color: '#7c3aed', bg: '#f5f3ff', border: '#8b5cf6', text: '#6d28d9', dashed: false },
+    ];
+    const customSet = new Set<string>();
+    photos.forEach((p) => {
+      const a = p.acta?.trim();
+      if (a && !a.toLowerCase().includes('sin acta') && !baseActas.some((b) => b.key.toLowerCase() === a.toLowerCase())) {
+        customSet.add(a);
+      }
+    });
+    const customList = Array.from(customSet).sort().map((customKey) => {
+      const theme = getActaTheme(customKey);
+      return {
+        key: customKey,
+        label: customKey,
+        estado: theme.estado || 'En Revisión',
+        color: theme.colorHex,
+        bg: theme.bgLight,
+        border: theme.borderHex,
+        text: theme.textHex,
+        dashed: false,
+      };
+    });
+    return [
+      ...baseActas,
+      ...customList,
+      { key: 'Sin Acta', label: 'Sin Acta', estado: 'Pendiente', color: '#94a3b8', bg: '#f8fafc', border: '#cbd5e1', text: '#475569', dashed: true },
+    ];
+  }, [photos]);
+
+  const toggleActaSelection = (actaKey: string) => {
+    setSelectedActasFilter((prev) => {
+      if (prev.includes(actaKey)) {
+        return prev.filter((k) => k !== actaKey);
+      } else {
+        return [...prev, actaKey];
+      }
+    });
+  };
+
+  const selectOnlyActa = (actaKey: string) => {
+    setSelectedActasFilter([actaKey]);
+  };
   const [isLayersSheetOpen, setIsLayersSheetOpen] = useState(false);
   const [isMobileToolsOpen, setIsMobileToolsOpen] = useState(false);
   const touchDraggedRef = useRef(false);
@@ -755,13 +812,33 @@ export const MapView: React.FC<MapViewProps> = ({
   }, [filtersByPlanArea]);
 
   useEffect(() => {
-    if (!isPanelOpen) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsPanelOpen(false);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+
+      if (event.key === 'Escape') {
+        if (isPanelOpen) {
+          setIsPanelOpen(false);
+        } else if (isHandToolActive) {
+          setIsHandToolActive(false);
+        }
+      } else if (event.key === 'h' || event.key === 'H') {
+        if (blueprint.imageUrl) {
+          toggleHandTool();
+        }
+      }
     };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [isPanelOpen]);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isPanelOpen, isHandToolActive, blueprint.imageUrl]);
 
   const pendingPhotos = useMemo(
     () => photos.filter((photo) => {
@@ -964,11 +1041,29 @@ export const MapView: React.FC<MapViewProps> = ({
     setSelectedPlanArea(null);
   };
 
+  const toggleHandTool = () => {
+    const nextHandMode = !isHandToolActive;
+    setIsHandToolActive(nextHandMode);
+    setActiveMapPopover(null);
+    if (nextHandMode) {
+      exitMultipleSelection();
+      setIsAreaSelectionMode(false);
+      setAreaSelectionBox(null);
+      setIsDraggingArea(false);
+      setPlacement(null);
+      setCreationMode(null);
+      setPipeStart(null);
+      setPipePreview(null);
+      if (calibrationMode) cancelCalibration();
+    }
+  };
+
   const toggleMultipleSelectionMode = () => {
     if (isMultipleSelectionMode) {
       exitMultipleSelection();
       return;
     }
+    setIsHandToolActive(false);
     setPlacement(null);
     setCreationMode(null);
     setPipeStart(null);
@@ -1910,13 +2005,27 @@ export const MapView: React.FC<MapViewProps> = ({
           <span className="material-symbols-outlined text-[16px]">highlight_alt</span>
           Selección de Área
         </button>
+        <button
+          type="button"
+          onClick={toggleHandTool}
+          className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold shadow-sm transition ${
+            isHandToolActive
+              ? 'border-[#073f74] bg-[#073f74] text-white shadow-xs ring-2 ring-[#073f74]/30'
+              : 'border-[#9fb5c5] bg-white text-[#173f58] hover:bg-[#eaf3f8]'
+          }`}
+          title={isHandToolActive ? 'Desactivar mano de paneo (1 solo clic) [H / Esc]' : 'Activar mano para mover el plano (1 solo clic) [H]'}
+          aria-pressed={isHandToolActive}
+        >
+          <span className="material-symbols-outlined text-[16px]">pan_tool_alt</span>
+          {isHandToolActive ? 'Mano (Activa)' : 'Mano'}
+        </button>
         {/* Selector de Modo de Coloreado del Plano */}
         <div className="inline-flex h-8 items-center rounded-full border border-[#9fb5c5] bg-[#eef3f5] p-0.5 text-[11px] font-bold shadow-xs">
           <button
             type="button"
             onClick={() => {
               setMapColorMode('redes');
-              setHighlightActaFilter(null);
+              setSelectedActasFilter([]);
             }}
             className={`inline-flex h-7 items-center gap-1 rounded-full px-2.5 transition ${
               mapColorMode === 'redes'
@@ -2101,10 +2210,24 @@ export const MapView: React.FC<MapViewProps> = ({
                   aria-label="Arrastra para mover el plano"
                   role="application"
                 >
-                  <span className="pointer-events-none absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-[#073f74]/90 px-2.5 py-1 text-[10px] font-bold text-white shadow-sm">
-                    <span className="material-symbols-outlined text-[14px]">pan_tool_alt</span>
-                    Modo mano
-                  </span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      toggleHandTool();
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    className="pointer-events-auto absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-[#073f74] hover:bg-[#002b54] px-3 py-1.5 text-xs font-bold text-white shadow-lg ring-2 ring-white/70 transition-all active:scale-95 cursor-pointer z-40"
+                    title="1 solo clic para desactivar la mano [Esc / H]"
+                  >
+                    <span className="material-symbols-outlined text-[15px]">pan_tool_alt</span>
+                    <span>Modo mano</span>
+                    <span className="flex items-center gap-0.5 rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-mono hover:bg-white/30">
+                      Desactivar
+                      <span className="material-symbols-outlined text-[12px]">close</span>
+                    </span>
+                  </button>
                 </div>
               )}
 
@@ -2234,7 +2357,7 @@ export const MapView: React.FC<MapViewProps> = ({
                       (() => {
                         const actaTheme = getActaTheme(photo.acta);
                         const isPending = !photo.acta || photo.acta.trim() === '' || photo.acta.toLowerCase().includes('sin acta');
-                        const isDimmed = highlightActaFilter && (isPending ? highlightActaFilter !== 'Sin Acta' : photo.acta !== highlightActaFilter);
+                        const isDimmed = selectedActasFilter.length > 0 && !isPhotoMatchingActaFilter(photo, selectedActasFilter);
                         return (
                           <>
                             <line
@@ -2407,7 +2530,7 @@ export const MapView: React.FC<MapViewProps> = ({
                 const cable = isCable(photo);
                 const actaTheme = getActaTheme(photo.acta);
                 const isPendingActa = !photo.acta || photo.acta.trim() === '' || photo.acta.toLowerCase().includes('sin acta');
-                const isDimmed = highlightActaFilter && (isPendingActa ? highlightActaFilter !== 'Sin Acta' : photo.acta !== highlightActaFilter);
+                const isDimmed = mapColorMode === 'actas' && selectedActasFilter.length > 0 && !isPhotoMatchingActaFilter(photo, selectedActasFilter);
                 const longitudinalMarkerColor = mapColorMode === 'actas'
                   ? actaTheme.colorHex
                   : isNotStarted(photo)
@@ -2493,7 +2616,7 @@ export const MapView: React.FC<MapViewProps> = ({
               const electricalOption = getElectricalElementOption(photo.electricalType);
               const actaTheme = getActaTheme(photo.acta);
               const isPendingActa = !photo.acta || photo.acta.trim() === '' || photo.acta.toLowerCase().includes('sin acta');
-              const isDimmed = highlightActaFilter && (isPendingActa ? highlightActaFilter !== 'Sin Acta' : photo.acta !== highlightActaFilter);
+              const isDimmed = mapColorMode === 'actas' && selectedActasFilter.length > 0 && !isPhotoMatchingActaFilter(photo, selectedActasFilter);
               const baseMarkerColor = electrical
                 ? photo.electricalColor || electricalOption.color
                 : !isCamera
@@ -2601,17 +2724,19 @@ export const MapView: React.FC<MapViewProps> = ({
                   >
                     <span className="material-symbols-outlined text-[15px] text-[#2563eb]">palette</span>
                     <span className="text-[11px] font-bold text-slate-700">
-                      Actas{highlightActaFilter ? `: ${highlightActaFilter}` : ''}
+                      Actas{selectedActasFilter.length > 0 ? `: ${selectedActasFilter.join(' + ')}` : ''}
                     </span>
-                    {highlightActaFilter && (
-                      <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
+                    {selectedActasFilter.length > 0 && (
+                      <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[9px] font-bold text-white">
+                        {selectedActasFilter.length}
+                      </span>
                     )}
                     <span className="material-symbols-outlined text-[15px] text-slate-400">expand_less</span>
                   </button>
                 </div>
               ) : (
                 <div
-                  className="absolute bottom-4 right-4 z-30 w-60 rounded-xl border border-slate-200/90 bg-white/95 p-2 shadow-xl backdrop-blur-md transition-shadow select-none pointer-events-auto"
+                  className="absolute bottom-4 right-4 z-30 w-64 rounded-xl border border-slate-200/90 bg-white/95 p-2.5 shadow-xl backdrop-blur-md transition-shadow select-none pointer-events-auto"
                   style={{
                     transform: `translate(${actasModalOffset.x}px, ${actasModalOffset.y}px)`,
                   }}
@@ -2633,21 +2758,31 @@ export const MapView: React.FC<MapViewProps> = ({
                       <span className="text-[11px] font-bold text-slate-800 truncate">
                         Codificación por Actas
                       </span>
+                      {selectedActasFilter.length > 0 && (
+                        <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1.5 text-[9px] font-bold text-white shrink-0">
+                          {selectedActasFilter.length}
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0">
-                      {highlightActaFilter && (
+                      {selectedActasFilter.length > 0 ? (
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setHighlightActaFilter(null);
+                            setSelectedActasFilter([]);
                           }}
-                          className="text-[9.5px] font-bold text-blue-600 hover:text-blue-800 hover:underline px-1 py-0.5 rounded"
-                          title="Mostrar todos los elementos"
+                          className="inline-flex items-center gap-0.5 text-[9.5px] font-bold text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 transition"
+                          title="Restablecer para mostrar todos los elementos en el plano"
                         >
-                          Todos
+                          <span>Todos</span>
+                          <span className="material-symbols-outlined text-[11px]">close</span>
                         </button>
+                      ) : (
+                        <span className="text-[9.5px] font-semibold text-slate-400 px-1 py-0.5">
+                          Todos
+                        </span>
                       )}
                       {actasModalOffset.x !== 0 || actasModalOffset.y !== 0 ? (
                         <button
@@ -2676,54 +2811,124 @@ export const MapView: React.FC<MapViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Contenido / Botones de Actas compactos */}
-                  <div className="space-y-1 text-[10px]">
-                    {[
-                      { key: 'Acta 1', label: 'Acta 1', estado: 'Facturado', color: '#2563eb', bg: '#eff6ff', border: '#3b82f6', text: '#1d4ed8', dashed: false },
-                      { key: 'Acta 2', label: 'Acta 2', estado: 'Facturado', color: '#059669', bg: '#ecfdf5', border: '#10b981', text: '#047857', dashed: false },
-                      { key: 'Acta 3', label: 'Acta 3', estado: 'En Revisión', color: '#7c3aed', bg: '#f5f3ff', border: '#8b5cf6', text: '#6d28d9', dashed: false },
-                      { key: 'Sin Acta', label: 'Sin Acta', estado: 'Pendiente', color: '#94a3b8', bg: '#f8fafc', border: '#cbd5e1', text: '#475569', dashed: true },
-                    ].map((item) => {
-                      const isSelected = highlightActaFilter === item.key;
+                  {/* Subtítulo informativo */}
+                  <div className="flex items-center justify-between text-[9px] text-slate-500 pb-1 mb-1 border-b border-slate-50">
+                    <span className="font-medium text-slate-600 truncate">
+                      {selectedActasFilter.length === 0
+                        ? 'Haz clic para seleccionar 2 o más actas:'
+                        : `${selectedActasFilter.length} acta${selectedActasFilter.length > 1 ? 's' : ''} activa${selectedActasFilter.length > 1 ? 's' : ''} en plano:`}
+                    </span>
+                    {selectedActasFilter.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedActasFilter([])}
+                        className="font-bold text-blue-600 hover:text-blue-800 hover:underline shrink-0 ml-1 text-[8.5px]"
+                      >
+                        Limpiar
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Contenido / Botones de Actas con soporte de multiselección */}
+                  <div className="space-y-1 text-[10px] max-h-56 overflow-y-auto pr-0.5">
+                    {availableActas.map((item) => {
+                      const isSelected = selectedActasFilter.includes(item.key);
                       const countInPlan = positionedPhotos.filter((p) => {
                         const pActa = p.acta?.trim();
                         if (item.key === 'Sin Acta') return !pActa || pActa.toLowerCase().includes('sin acta');
-                        return pActa === item.key;
+                        return pActa === item.key || pActa?.toLowerCase() === item.key.toLowerCase();
                       }).length;
 
                       return (
-                        <button
+                        <div
                           key={item.key}
-                          type="button"
-                          onClick={() => setHighlightActaFilter(isSelected ? null : item.key)}
-                          className={`w-full flex items-center justify-between px-2 py-1 rounded-md border transition text-left ${
-                            isSelected ? 'ring-2 ring-blue-500 font-bold bg-blue-50' : 'hover:bg-slate-50'
+                          onClick={() => toggleActaSelection(item.key)}
+                          className={`group w-full flex items-center justify-between px-2 py-1 rounded-md border transition text-left cursor-pointer select-none ${
+                            isSelected
+                              ? 'ring-2 ring-blue-500 shadow-xs font-bold'
+                              : selectedActasFilter.length > 0
+                                ? 'opacity-60 hover:opacity-100 hover:bg-slate-50'
+                                : 'hover:bg-slate-50'
                           }`}
-                          style={{ borderColor: item.border, backgroundColor: isSelected ? undefined : item.bg }}
-                          title={`Hacer clic para aislar elementos de ${item.label}`}
+                          style={{
+                            borderColor: isSelected ? item.color : item.border,
+                            backgroundColor: isSelected ? item.bg : '#ffffff',
+                          }}
+                          title={`Clic para ${isSelected ? 'desmarcar' : 'incluir'} ${item.label} en la vista del plano`}
                         >
-                          <div className="flex items-center gap-1.5 min-w-0">
+                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                            {/* Checkbox indicador de multiselección */}
+                            <span
+                              className={`flex h-3.5 w-3.5 items-center justify-center rounded border transition shrink-0 ${
+                                isSelected
+                                  ? 'border-blue-600 bg-blue-600 text-white'
+                                  : 'border-slate-300 bg-white group-hover:border-slate-400'
+                              }`}
+                              style={{
+                                borderColor: isSelected ? item.color : undefined,
+                                backgroundColor: isSelected ? item.color : '#ffffff',
+                              }}
+                            >
+                              {isSelected && (
+                                <span className="material-symbols-outlined text-[10px] leading-none text-white font-black">
+                                  check
+                                </span>
+                              )}
+                            </span>
+
+                            {/* Bullet circular de color */}
                             <span
                               className={`w-2.5 h-2.5 rounded-full flex items-center justify-center shrink-0 ${
                                 item.dashed ? 'border border-dashed' : ''
                               }`}
                               style={{ backgroundColor: item.dashed ? '#e2e8f0' : item.color, borderColor: item.color }}
                             />
-                            <span className="font-semibold truncate text-[10.5px]" style={{ color: item.text }}>{item.label}</span>
+
+                            <span className="font-semibold truncate text-[10.5px]" style={{ color: item.text }}>
+                              {item.label}
+                            </span>
+
                             <span
-                              className="text-[7.5px] px-1 py-0.2 rounded font-sans border font-medium"
+                              className="text-[7.5px] px-1 py-0.2 rounded font-sans border font-medium shrink-0"
                               style={{ color: item.text, borderColor: item.border, backgroundColor: '#ffffff' }}
                             >
                               {item.estado}
                             </span>
                           </div>
-                          <span className="text-[9.5px] font-mono font-bold text-slate-500 ml-1 shrink-0">
-                            {countInPlan} elem
-                          </span>
-                        </button>
+
+                          <div className="flex items-center gap-1 shrink-0 ml-1">
+                            <span className="text-[9.5px] font-mono font-bold text-slate-500">
+                              {countInPlan} elem
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                selectOnlyActa(item.key);
+                              }}
+                              className="opacity-0 group-hover:opacity-100 rounded px-1 py-0.5 text-[8px] font-bold text-slate-500 hover:text-blue-700 hover:bg-blue-50 transition border border-transparent hover:border-blue-200"
+                              title={`Aislar exclusivamente ${item.label}`}
+                            >
+                              Solo
+                            </button>
+                          </div>
+                        </div>
                       );
                     })}
                   </div>
+
+                  {/* Resumen de elementos activos cuando hay filtro multiselección */}
+                  {selectedActasFilter.length > 0 && (
+                    <div className="mt-1.5 flex items-center justify-between rounded bg-blue-50/90 px-2 py-1 text-[9px] font-bold text-blue-800 border border-blue-100">
+                      <span className="flex items-center gap-1 truncate max-w-[150px]" title={selectedActasFilter.join(', ')}>
+                        <span className="material-symbols-outlined text-[12px] text-blue-600 shrink-0">visibility</span>
+                        <span className="truncate">{selectedActasFilter.join(' + ')}</span>
+                      </span>
+                      <span className="font-mono shrink-0">
+                        {positionedPhotos.filter((p) => isPhotoMatchingActaFilter(p, selectedActasFilter)).length} elem visibles
+                      </span>
+                    </div>
+                  )}
 
                   {/* Leyenda Footer compacta */}
                   <div className="mt-1.5 pt-1 border-t border-slate-100 flex items-center justify-between text-[8.5px] text-slate-500">
@@ -3318,6 +3523,23 @@ export const MapView: React.FC<MapViewProps> = ({
         </button>}
         <div data-testid="secondary-map-accesses" className={areSecondaryAccessesCollapsed ? 'hidden sm:contents' : 'contents'}>
         {blueprint.imageUrl && (
+          <button
+            type="button"
+            onClick={toggleHandTool}
+            aria-label={isHandToolActive ? 'Desactivar modo mano' : 'Activar modo mano'}
+            aria-pressed={isHandToolActive}
+            className={`flex h-11 w-11 items-center justify-center rounded-xl border p-0 text-xs font-bold shadow-sm transition sm:h-10 sm:w-auto sm:gap-1.5 sm:px-3 ${
+              isHandToolActive
+                ? 'border-[#073f74] bg-[#073f74] text-white ring-2 ring-[#073f74]/30 shadow-md'
+                : 'border-[#c7d7df] bg-white text-[#285b72] hover:bg-[#eaf6fb]'
+            }`}
+            title={isHandToolActive ? 'Desactivar mano de paneo (1 solo clic) [H / Esc]' : 'Activar mano para mover el plano (1 solo clic) [H]'}
+          >
+            <span className="material-symbols-outlined text-[20px] sm:text-[19px]">pan_tool_alt</span>
+            <span className="hidden md:inline">{isHandToolActive ? 'Mano (Activa)' : 'Mano'}</span>
+          </button>
+        )}
+        {blueprint.imageUrl && (
           <div className="static sm:relative">
             {activeMapPopover === 'view' && (
               <div role="dialog" aria-label="Ajustes de vista del plano" className="fixed bottom-[calc(3.75rem+env(safe-area-inset-bottom))] left-2 right-2 max-h-[calc(100dvh-5.25rem)] overflow-y-auto rounded-xl border border-[#b7d4e1] bg-white shadow-[0_14px_30px_rgba(10,54,83,0.22)] sm:absolute sm:bottom-12 sm:left-auto sm:right-0 sm:max-h-[min(75vh,32rem)] sm:w-[min(20rem,calc(100vw-2rem))]">
@@ -3365,8 +3587,8 @@ export const MapView: React.FC<MapViewProps> = ({
                     </button>
                   )}
                   <div className="rounded-lg border border-[#d7e5eb] bg-[#fbfdfe] px-3 py-2 text-xs text-[#426373]"><strong className="text-[#0b2940]">{photos.filter((photo) => isPlaced(photo)).length}</strong> ubicados · <strong className="text-[#0b2940]">{totalPipelineMeters.toFixed(1)} m</strong> de tubería</div>
-                  <button type="button" onClick={() => { const nextHandMode = !isHandToolActive; setIsHandToolActive(nextHandMode); setActiveMapPopover(null); if (nextHandMode) { exitMultipleSelection(); setPlacement(null); setCreationMode(null); setPipeStart(null); setPipePreview(null); if (calibrationMode) cancelCalibration(); } }} className={`flex w-full items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-xs font-bold transition ${isHandToolActive ? 'border-[#073f74] bg-[#073f74] text-white' : 'border-[#c7d7df] bg-white text-[#285b72] hover:bg-[#eaf6fb]'}`} aria-pressed={isHandToolActive}>
-                    <span className="material-symbols-outlined text-[19px]">pan_tool_alt</span><span className="flex-1">{isHandToolActive ? 'Mano activa' : 'Activar mano'}</span><span className="text-[10px] font-medium">Mover plano</span>
+                  <button type="button" onClick={toggleHandTool} className={`flex w-full items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-xs font-bold transition ${isHandToolActive ? 'border-[#073f74] bg-[#073f74] text-white' : 'border-[#c7d7df] bg-white text-[#285b72] hover:bg-[#eaf6fb]'}`} aria-pressed={isHandToolActive}>
+                    <span className="material-symbols-outlined text-[19px]">pan_tool_alt</span><span className="flex-1">{isHandToolActive ? 'Mano activa (clic para desactivar)' : 'Activar mano (1 solo clic)'}</span><span className="text-[10px] font-medium">Mover plano</span>
                   </button>
                 </div>
               </div>
@@ -3515,6 +3737,20 @@ export const MapView: React.FC<MapViewProps> = ({
           >
             <span className="material-symbols-outlined text-[16px]">crop_free</span>
             <span className="text-[9px] font-mono font-bold leading-none">{Math.round(planScale * 100)}%</span>
+          </button>
+          <div className="h-[1px] bg-[#e1ebef] w-full" />
+          <button
+            type="button"
+            onClick={toggleHandTool}
+            aria-label={isHandToolActive ? 'Desactivar modo mano' : 'Activar modo mano'}
+            className={`flex h-11 w-11 items-center justify-center transition ${
+              isHandToolActive
+                ? 'bg-[#073f74] text-white'
+                : 'text-[#073f74] hover:bg-[#eaf6fb] active:bg-[#d6ecf7]'
+            }`}
+            title={isHandToolActive ? 'Desactivar mano de paneo (1 solo toque)' : 'Activar mano para mover el plano (1 solo toque)'}
+          >
+            <span className="material-symbols-outlined text-[20px]">pan_tool_alt</span>
           </button>
         </div>
       </div>
@@ -3816,7 +4052,7 @@ export const MapView: React.FC<MapViewProps> = ({
                 type="button"
                 onClick={() => {
                   setMapColorMode('redes');
-                  setHighlightActaFilter(null);
+                  setSelectedActasFilter([]);
                 }}
                 className={`flex items-center justify-center gap-2 rounded-xl border p-2.5 text-xs font-bold transition ${
                   mapColorMode === 'redes'
