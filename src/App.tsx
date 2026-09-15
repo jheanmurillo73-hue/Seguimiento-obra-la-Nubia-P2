@@ -868,24 +868,26 @@ export default function App() {
   // make sure to consider if you need authentication for certain routes
   return (
     <div className="min-h-screen flex flex-col bg-[#f3faff] text-[#071e27] font-['Inter']">
-      {/* Fixed Top Nav Bar */}
-      <TopNavBar
-        currentTab={currentTab}
-        onTabChange={handleTabChange}
-        inspector={inspector}
-        allowedModules={userAccess.allowedModules}
-        isAdmin={userAccess.role === 'admin'}
-        onOpenProfile={() => setIsProfileModalOpen(true)}
-        activities={activities}
-        onOpenPhoto={handleOpenPhotoFromActivity}
-        onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-        onOpenAuth={() => setIsAuthModalOpen(true)}
-        onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
-        connectionState={connectionState}
-        onRefreshConnection={refreshConnection}
-      />
+      {/* Fixed Top Nav Bar (hidden on mobile when currentTab === 'map' for 100vw x 100vh full-screen view) */}
+      <div className={currentTab === 'map' ? 'hidden md:block' : 'block'}>
+        <TopNavBar
+          currentTab={currentTab}
+          onTabChange={handleTabChange}
+          inspector={inspector}
+          allowedModules={userAccess.allowedModules}
+          isAdmin={userAccess.role === 'admin'}
+          onOpenProfile={() => setIsProfileModalOpen(true)}
+          activities={activities}
+          onOpenPhoto={handleOpenPhotoFromActivity}
+          onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          onOpenAuth={() => setIsAuthModalOpen(true)}
+          onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
+          connectionState={connectionState}
+          onRefreshConnection={refreshConnection}
+        />
+      </div>
 
-      <div className="flex flex-1 pt-16 w-full max-w-full min-w-0 overflow-x-hidden">
+      <div className={`flex flex-1 ${currentTab === 'map' ? 'pt-0 md:pt-16' : 'pt-16'} w-full max-w-full min-w-0 overflow-x-hidden`}>
         {/* Fixed Side Nav Bar (Desktop & Mobile Drawer) */}
         <SideNavBar
           currentTab={currentTab}
@@ -903,7 +905,7 @@ export default function App() {
         />
 
         {/* Main Content Area */}
-        <div className={`flex-1 md:ml-64 flex flex-col w-full max-w-full min-w-0 overflow-x-hidden ${currentTab === 'map' ? 'h-[calc(100vh-64px)] overflow-hidden' : 'min-h-[calc(100vh-64px)] justify-between'}`}>
+        <div className={`flex-1 md:ml-64 flex flex-col w-full max-w-full min-w-0 overflow-x-hidden ${currentTab === 'map' ? 'h-[100dvh] md:h-[calc(100vh-64px)] overflow-hidden' : 'min-h-[calc(100vh-64px)] justify-between'}`}>
           <main className={`${currentTab === 'map' ? 'p-0 h-full w-full relative overflow-hidden' : 'p-2.5 sm:p-6 lg:p-8 flex-1 w-full max-w-full min-w-0 overflow-x-hidden'}`}>
             {currentTab === 'admin' && userAccess.role === 'admin' ? (
               <UserManagementView currentUser={userAccess} onShowToast={showToast} />

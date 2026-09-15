@@ -461,6 +461,25 @@ export const MapView: React.FC<MapViewProps> = ({
   const [mapColorMode, setMapColorMode] = useState<'redes' | 'actas'>('redes');
   const [highlightActaFilter, setHighlightActaFilter] = useState<string | null>(null);
   const [isLayersSheetOpen, setIsLayersSheetOpen] = useState(false);
+  const [isMobileToolsOpen, setIsMobileToolsOpen] = useState(false);
+  const touchDraggedRef = useRef(false);
+  const touchStateRef = useRef<{
+    startDist: number;
+    startScale: number;
+    startX: number;
+    startY: number;
+    initialOffsetX: number;
+    initialOffsetY: number;
+    lastTapTime: number;
+  }>({
+    startDist: 0,
+    startScale: 1,
+    startX: 0,
+    startY: 0,
+    initialOffsetX: 0,
+    initialOffsetY: 0,
+    lastTapTime: 0,
+  });
   const [selectedSector, setSelectedSector] = useState<SectorFilterOption>('TODOS');
   const [isActasMenuCollapsed, setIsActasMenuCollapsed] = useState<boolean>(() =>
     localStorage.getItem('photovault_actas_menu_collapsed') === 'true'
@@ -1260,6 +1279,10 @@ export const MapView: React.FC<MapViewProps> = ({
   };
 
   const handleCanvasClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (touchDraggedRef.current) {
+      touchDraggedRef.current = false;
+      return;
+    }
     if (!isAdmin) return;
     const bounds = event.currentTarget.getBoundingClientRect();
     if (!bounds.width || !bounds.height) return;
@@ -1401,6 +1424,78 @@ export const MapView: React.FC<MapViewProps> = ({
   const stopPanning = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     panStartRef.current = null;
+  };
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      const now = Date.now();
+      if (now - touchStateRef.current.lastTapTime < 300) {
+        // Doble tap: alternar zoom rápido 1.8x / 1x
+        setBlueprint((prev) => ({
+          ...prev,
+          scale: (Number(prev.scale) || 1) > 1.2 ? 1 : 1.8,
+        }));
+        touchStateRef.current.lastTapTime = 0;
+        return;
+      }
+      touchStateRef.current.lastTapTime = now;
+
+      // Iniciar arrastre con 1 dedo para navegación fluida
+      if (!placement && !creationMode && !isAreaSelectionMode && !dragTarget) {
+        touchDraggedRef.current = false;
+        touchStateRef.current.startX = touch.clientX;
+        touchStateRef.current.startY = touch.clientY;
+        touchStateRef.current.initialOffsetX = panOffset.x;
+        touchStateRef.current.initialOffsetY = panOffset.y;
+      }
+    } else if (e.touches.length === 2) {
+      // Pellizco para zoom (pinch-to-zoom) con 2 dedos
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const dist = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY);
+      touchStateRef.current.startDist = dist;
+      touchStateRef.current.startScale = Number(blueprint.scale) || 1;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 1 && !placement && !creationMode && !isAreaSelectionMode && !dragTarget) {
+      const touch = e.touches[0];
+      const deltaX = touch.clientX - touchStateRef.current.startX;
+      const deltaY = touch.clientY - touchStateRef.current.startY;
+      if (Math.hypot(deltaX, deltaY) > 6) {
+        touchDraggedRef.current = true;
+      }
+      setPanOffset({
+        x: touchStateRef.current.initialOffsetX + deltaX,
+        y: touchStateRef.current.initialOffsetY + deltaY,
+      });
+    } else if (e.touches.length === 2) {
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const dist = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY);
+      if (touchStateRef.current.startDist > 0) {
+        touchDraggedRef.current = true;
+        const factor = dist / touchStateRef.current.startDist;
+        const newScale = clampScale(touchStateRef.current.startScale * factor, 0.45, 8);
+        setBlueprint((prev) => ({ ...prev, scale: newScale }));
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setTimeout(() => {
+      touchDraggedRef.current = false;
+    }, 60);
+  };
+
+  const handleCanvasWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      const delta = e.deltaY < 0 ? 0.25 : -0.25;
+      adjustPlanScale(delta);
+    }
   };
 
   const handleCanvasDrop = (event: React.DragEvent<HTMLDivElement>) => {
@@ -1619,7 +1714,7 @@ export const MapView: React.FC<MapViewProps> = ({
         </div>
       )}
 
-      <header className="relative z-30 flex shrink-0 flex-col gap-3 border-b border-[#c7d7df] bg-white/95 px-4 py-3 shadow-sm backdrop-blur xl:flex-row xl:items-center xl:justify-between">
+      <header className="relative z-30 hidden md:flex shrink-0 flex-col gap-3 border-b border-[#c7d7df] bg-white/95 px-4 py-3 shadow-sm backdrop-blur xl:flex-row xl:items-center xl:justify-between">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white shadow-sm" style={{ backgroundColor: activeAreaDetails.color }}>
             <span className="material-symbols-outlined text-[21px]">{activeAreaDetails.icon}</span>
@@ -1699,7 +1794,7 @@ export const MapView: React.FC<MapViewProps> = ({
         </div>
       </header>
 
-      <div className="relative z-20 shrink-0 overflow-x-auto border-b border-[#c7d7df] bg-[#f7fbfd]/95 px-4 py-2 shadow-sm">
+      <div className="relative z-20 hidden md:block shrink-0 overflow-x-auto border-b border-[#c7d7df] bg-[#f7fbfd]/95 px-4 py-2 shadow-sm">
       <div className="flex min-w-max items-center gap-2 pr-4">
         {/* Acceso rápido a capas de obra (oculto en móvil < 768px por indicación, reemplazado por FAB "Capas") */}
         <div className="mr-1 hidden md:inline-flex items-center gap-1 rounded-lg border border-[#b9d0db] bg-white p-1 shadow-xs" aria-label="Acceso rápido a capas de obra" role="group">
@@ -1896,10 +1991,50 @@ export const MapView: React.FC<MapViewProps> = ({
       </div>
       </div>
 
-      <main className="relative min-h-0 flex-1 overflow-auto p-5">
+      {/* Barra superior flotante para móvil (< 768px): espacio en flujo cero para pantalla completa 100vw x 100vh */}
+      <div className="fixed top-2.5 left-3 right-3 z-40 md:hidden pointer-events-none flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => setIsLayersSheetOpen(true)}
+          className="pointer-events-auto flex h-10 items-center gap-1.5 rounded-xl border border-[#9dbbc9]/90 bg-white/95 px-3 text-xs font-bold text-[#073f74] shadow-md backdrop-blur-md transition active:scale-95"
+          title="Cambiar capa técnica o sector"
+        >
+          <span className="material-symbols-outlined text-[18px]" style={{ color: activeAreaDetails.color }}>{activeAreaDetails.icon}</span>
+          <span className="max-w-[110px] truncate">{activeAreaDetails.shortLabel || activeAreaDetails.label.split(' ')[0]}</span>
+          <span className="text-[#b4cbd8]">·</span>
+          <span className="font-mono text-[11px] text-[#0566aa]">{selectedSector}</span>
+        </button>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsMobileToolsOpen(true)}
+            className="pointer-events-auto flex h-10 items-center gap-1.5 rounded-xl bg-[#073f74] px-3 text-xs font-bold text-white shadow-md transition active:scale-95"
+            title="Abrir herramientas, filtros y búsqueda"
+          >
+            <span className="material-symbols-outlined text-[18px]">tune</span>
+            <span>Herramientas</span>
+            {activeFilter !== 'all' && (
+              <span className="flex h-2 w-2 rounded-full bg-amber-400" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsFullscreen((prev) => !prev)}
+            className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-xl border border-[#9dbbc9]/90 bg-white/95 text-[#073f74] shadow-md backdrop-blur-md transition active:scale-95"
+            title={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+            aria-label="Pantalla completa"
+          >
+            <span className="material-symbols-outlined text-[20px]">{isFullscreen ? 'fullscreen_exit' : 'fullscreen'}</span>
+          </button>
+        </div>
+      </div>
+
+      <main className="relative min-h-0 flex-1 overflow-hidden p-0 md:p-5 h-full w-full touch-none">
         {/* Banner flotante de sector activo para navegación fluida */}
         {selectedSector !== 'TODOS' && (
-          <div className="pointer-events-auto absolute top-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 rounded-full border border-blue-200 bg-white/95 px-3 py-1.5 text-xs font-bold text-blue-950 shadow-lg backdrop-blur-xs">
+          <div className="pointer-events-auto absolute top-14 md:top-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 rounded-full border border-blue-200 bg-white/95 px-3 py-1.5 text-xs font-bold text-blue-950 shadow-lg backdrop-blur-xs">
             <span className="flex h-2 w-2 rounded-full bg-blue-600 animate-pulse" />
             <span>Sector activo: {SECTOR_OPTIONS.find((s) => s.code === selectedSector)?.label}</span>
             <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-mono font-bold text-blue-800">
@@ -1928,17 +2063,22 @@ export const MapView: React.FC<MapViewProps> = ({
           </div>
         )}
         {blueprint.imageUrl ? (
-          <div className="flex min-h-full min-w-full items-center justify-center py-3">
+          <div className="flex h-full w-full min-h-full min-w-full items-center justify-center p-0 md:py-3 select-none">
             <div
               onClick={handleCanvasClick}
               onMouseMove={handleCanvasMouseMove}
               onMouseLeave={handleCanvasMouseLeave}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+              onTouchCancel={handleTouchEnd}
+              onWheel={handleCanvasWheel}
               onDragOver={(event) => {
                 event.preventDefault();
                 event.dataTransfer.dropEffect = 'move';
               }}
               onDrop={handleCanvasDrop}
-              className={`relative inline-flex max-h-[calc(100vh-15rem)] max-w-[calc(100vw-3rem)] overflow-hidden border border-[#9dbbc9] bg-white shadow-[0_18px_46px_rgba(7,63,116,0.22)] transition-transform duration-200 ${
+              className={`relative inline-flex h-full w-full md:max-h-[calc(100vh-15rem)] md:max-w-[calc(100vw-3rem)] overflow-hidden border-0 md:border md:border-[#9dbbc9] bg-[#e7edf1] md:bg-white shadow-none md:shadow-[0_18px_46px_rgba(7,63,116,0.22)] transition-transform duration-100 select-none ${
                 placement || creationMode ? 'cursor-crosshair' : dragTarget ? 'ring-2 ring-[#18a9cf] ring-offset-2' : 'cursor-default'
               }`}
               style={{ transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${planScale})` }}
@@ -1947,7 +2087,7 @@ export const MapView: React.FC<MapViewProps> = ({
               <img
                 src={blueprint.imageUrl}
                 alt={blueprint.name}
-                className="block max-h-[calc(100vh-15rem)] max-w-[calc(100vw-3rem)] object-contain"
+                className="block h-full w-full md:max-h-[calc(100vh-15rem)] md:max-w-[calc(100vw-3rem)] object-contain select-none pointer-events-none"
                 draggable={false}
               />
 
@@ -3160,7 +3300,7 @@ export const MapView: React.FC<MapViewProps> = ({
         </div>
       )}
 
-      <div className="absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] right-2 z-20 flex items-center gap-1.5 sm:bottom-4 sm:right-4 sm:gap-2">
+      <div className="absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] right-2 z-20 hidden md:flex items-center gap-1.5 sm:bottom-4 sm:right-4 sm:gap-2">
         {blueprint.imageUrl && <button
           type="button"
           onClick={() => {
@@ -3338,16 +3478,57 @@ export const MapView: React.FC<MapViewProps> = ({
         }}
       />
 
+      {/* Controles flotantes móviles de zoom y navegación (< 768px) */}
+      <div className="fixed bottom-6 left-3 z-30 md:hidden flex flex-col gap-2">
+        <div className="flex flex-col rounded-xl bg-white/95 border border-[#9dbbc9]/90 shadow-xl overflow-hidden backdrop-blur-md">
+          <button
+            type="button"
+            onClick={() => adjustPlanScale(0.35)}
+            disabled={planScale >= 8}
+            className="flex h-11 w-11 items-center justify-center text-[#073f74] hover:bg-[#eaf6fb] active:bg-[#d6ecf7] transition disabled:opacity-30"
+            title="Acercar plano (+)"
+            aria-label="Acercar plano"
+          >
+            <span className="material-symbols-outlined text-[22px]">add</span>
+          </button>
+          <div className="h-[1px] bg-[#e1ebef] w-full" />
+          <button
+            type="button"
+            onClick={() => adjustPlanScale(-0.35)}
+            disabled={planScale <= 0.45}
+            className="flex h-11 w-11 items-center justify-center text-[#073f74] hover:bg-[#eaf6fb] active:bg-[#d6ecf7] transition disabled:opacity-30"
+            title="Alejar plano (-)"
+            aria-label="Alejar plano"
+          >
+            <span className="material-symbols-outlined text-[22px]">remove</span>
+          </button>
+          <div className="h-[1px] bg-[#e1ebef] w-full" />
+          <button
+            type="button"
+            onClick={() => {
+              setPanOffset({ x: 0, y: 0 });
+              setBlueprint((prev) => ({ ...prev, scale: 1 }));
+            }}
+            className="flex h-11 w-11 flex-col items-center justify-center text-[#073f74] hover:bg-[#eaf6fb] active:bg-[#d6ecf7] transition"
+            title="Restablecer vista 100%"
+            aria-label="Restablecer vista al 100%"
+          >
+            <span className="material-symbols-outlined text-[16px]">crop_free</span>
+            <span className="text-[9px] font-mono font-bold leading-none">{Math.round(planScale * 100)}%</span>
+          </button>
+        </div>
+      </div>
+
       {/* Botón flotante móvil para desplegar el BottomSheet de Capas y Sectores (< 768px) */}
-      <div className="fixed bottom-6 right-6 z-40 md:hidden">
+      <div className="fixed bottom-6 right-3 z-30 md:hidden">
         <button
           type="button"
           onClick={() => setIsLayersSheetOpen(true)}
-          className="flex h-14 w-14 items-center justify-center rounded-full bg-[#073f74] text-white shadow-2xl ring-4 ring-white/60 transition hover:bg-[#052c52] active:scale-95"
+          className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#073f74] text-white shadow-xl ring-2 ring-white/80 transition hover:bg-[#052c52] active:scale-95"
           aria-label="Abrir capas de obra"
           title="Capas y sectores de obra"
         >
-          <span className="material-symbols-outlined text-[26px]">layers</span>
+          <span className="material-symbols-outlined text-[24px]">layers</span>
         </button>
       </div>
 
@@ -3477,6 +3658,259 @@ export const MapView: React.FC<MapViewProps> = ({
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+      </BottomSheet>
+
+      {/* BottomSheet de Herramientas y Filtros para móvil */}
+      <BottomSheet
+        isOpen={isMobileToolsOpen}
+        onClose={() => setIsMobileToolsOpen(false)}
+        title="Herramientas y Filtros del Plano"
+      >
+        <div className="space-y-4 pb-8">
+          {/* Búsqueda rápida */}
+          <div className="relative">
+            <span className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-[#5d7887]">search</span>
+            <input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Buscar por código, cámara o sector…"
+              className="h-10 w-full rounded-xl border border-[#c7d7df] bg-slate-50 py-1 pl-9 pr-8 text-xs text-[#0b2940] outline-none transition focus:border-[#0566aa] focus:bg-white focus:ring-2 focus:ring-[#0566aa]/15"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <span className="material-symbols-outlined text-[16px]">close</span>
+              </button>
+            )}
+          </div>
+
+          {/* Acciones principales de creación para administradores */}
+          {isAdmin && (
+            <div>
+              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500">
+                Agregar al Plano
+              </label>
+              {selectedPlanArea === 'civil' ? (
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPlacement(null);
+                      setPipeStart(null);
+                      setPipePreview(null);
+                      setCreationMode('caja');
+                      setIsMobileToolsOpen(false);
+                    }}
+                    className={`flex flex-col items-center justify-center gap-1 rounded-xl border p-2.5 text-xs font-bold transition ${
+                      creationMode === 'caja'
+                        ? 'border-[#0b5d8c] bg-[#e5f4fb] text-[#075a91]'
+                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[20px] text-[#b77812]">inventory_2</span>
+                    <span>Caja</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPlacement(null);
+                      setPipeStart(null);
+                      setPipePreview(null);
+                      setCreationMode('camara');
+                      setIsMobileToolsOpen(false);
+                    }}
+                    className={`flex flex-col items-center justify-center gap-1 rounded-xl border p-2.5 text-xs font-bold transition ${
+                      creationMode === 'camara'
+                        ? 'border-[#0b5d8c] bg-[#e5f4fb] text-[#075a91]'
+                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[20px] text-[#0566aa]">videocam</span>
+                    <span>Cámara</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPlacement(null);
+                      setPipeStart(null);
+                      setPipePreview(null);
+                      setCreationMode('tuberia');
+                      setIsMobileToolsOpen(false);
+                    }}
+                    className={`flex flex-col items-center justify-center gap-1 rounded-xl border p-2.5 text-xs font-bold transition ${
+                      creationMode === 'tuberia'
+                        ? 'border-[#0b5d8c] bg-[#e5f4fb] text-[#075a91]'
+                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[20px] text-[#007f98]">timeline</span>
+                    <span>Tubería</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {electricalOptionsForArea.slice(0, 4).map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => {
+                        setPlacement(null);
+                        setPipeStart(null);
+                        setPipePreview(null);
+                        setCreationMode(option.value);
+                        setIsMobileToolsOpen(false);
+                      }}
+                      className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white p-2.5 text-left text-xs font-bold text-slate-700 hover:bg-slate-50"
+                    >
+                      <span className="material-symbols-outlined text-[18px]" style={{ color: option.color }}>{option.icon}</span>
+                      <span className="truncate">{option.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Filtros por tipo de elemento */}
+          <div>
+            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500">
+              Filtrar Geometrías
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {(selectedPlanArea !== 'civil'
+                ? [['all', 'Todos', 'bolt'], ['not_started', 'No iniciado', 'schedule'], ['pending', 'Sin ubicar', 'location_off']]
+                : [['all', 'Todos', 'layers'], ['camara', 'Cámaras', 'videocam'], ['caja', 'Cajas', 'inventory_2'], ['tuberia', 'Tuberías', 'timeline'], ['not_started', 'No iniciado', 'schedule'], ['pending', 'Sin ubicar', 'location_off']]
+              ).map(([filter, label, icon]) => (
+                <button
+                  key={filter}
+                  type="button"
+                  onClick={() => {
+                    setActiveFilter(filter as PlanFilter);
+                    setIsMobileToolsOpen(false);
+                  }}
+                  className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-bold transition ${
+                    activeFilter === filter
+                      ? 'border-[#0566aa] bg-[#e5f4fb] text-[#004d84]'
+                      : 'border-slate-200 bg-white text-slate-600'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[15px]">{icon}</span>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Modo de color: Redes vs Actas */}
+          <div>
+            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500">
+              Modo de Color
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setMapColorMode('redes');
+                  setHighlightActaFilter(null);
+                }}
+                className={`flex items-center justify-center gap-2 rounded-xl border p-2.5 text-xs font-bold transition ${
+                  mapColorMode === 'redes'
+                    ? 'border-[#073f74] bg-[#073f74] text-white shadow-xs'
+                    : 'border-slate-200 bg-white text-slate-700'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[18px]">lan</span>
+                Redes Técnicas
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMapColorMode('actas');
+                  setAreActaLabelsVisible(true);
+                  setIsActasMenuCollapsed(false);
+                }}
+                className={`flex items-center justify-center gap-2 rounded-xl border p-2.5 text-xs font-bold transition ${
+                  mapColorMode === 'actas'
+                    ? 'border-[#2563eb] bg-[#2563eb] text-white shadow-xs'
+                    : 'border-slate-200 bg-white text-slate-700'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[18px]">palette</span>
+                Color por Actas
+              </button>
+            </div>
+          </div>
+
+          {/* Rótulos y Nombres */}
+          <div>
+            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500">
+              Visibilidad de Etiquetas
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setAreActaLabelsVisible((v) => !v)}
+                className={`flex items-center justify-center gap-1.5 rounded-xl border p-2 text-xs font-bold transition ${
+                  areActaLabelsVisible ? 'border-[#0b5d8c] bg-[#e5f4fb] text-[#075a91]' : 'border-slate-200 bg-white text-slate-600'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[16px]">{areActaLabelsVisible ? 'visibility' : 'visibility_off'}</span>
+                Actas
+              </button>
+              <button
+                type="button"
+                onClick={() => setAreCameraNamesVisible((v) => !v)}
+                className={`flex items-center justify-center gap-1.5 rounded-xl border p-2 text-xs font-bold transition ${
+                  areCameraNamesVisible ? 'border-[#0b5d8c] bg-[#e5f4fb] text-[#075a91]' : 'border-slate-200 bg-white text-slate-600'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[16px]">{areCameraNamesVisible ? 'visibility' : 'visibility_off'}</span>
+                Cámaras
+              </button>
+              <button
+                type="button"
+                onClick={() => setArePipeNamesVisible((v) => !v)}
+                className={`flex items-center justify-center gap-1.5 rounded-xl border p-2 text-xs font-bold transition ${
+                  arePipeNamesVisible ? 'border-[#4f46e5] bg-indigo-50 text-[#3730a3]' : 'border-slate-200 bg-white text-slate-600'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[16px]">{arePipeNamesVisible ? 'visibility' : 'visibility_off'}</span>
+                Tramos
+              </button>
+            </div>
+          </div>
+
+          {/* Acciones adicionales */}
+          <div className="pt-2 border-t border-slate-100 flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setIsMobileToolsOpen(false);
+                requestReturnToAreas();
+              }}
+              className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white p-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+            >
+              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+              Volver al Menú de Áreas
+            </button>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileToolsOpen(false);
+                  setIsPanelOpen(true);
+                }}
+                className="flex items-center justify-center gap-2 rounded-xl border border-[#b4cbd8] bg-[#eaf6fb] p-2.5 text-xs font-bold text-[#075a91]"
+              >
+                <span className="material-symbols-outlined text-[18px]">format_list_bulleted</span>
+                Ubicar Elementos Pendientes ({pendingPhotos.length})
+              </button>
+            )}
           </div>
         </div>
       </BottomSheet>
