@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { InspectionPhoto } from '../types';
 import {
   ProjectTask,
@@ -16,6 +16,7 @@ import {
   resolvePhotoSectorCode,
   resolvePhotoNetworkType,
 } from '../services/projectScheduleService';
+import { isSupabaseConfigured } from '../lib/supabase';
 
 interface ProjectScheduleViewProps {
   photos: InspectionPhoto[];
@@ -55,10 +56,119 @@ export const ProjectScheduleView: React.FC<ProjectScheduleViewProps> = ({
   const [formCriterioCalculo, setFormCriterioCalculo] = useState<CalculationCriteria>('metros_lineales');
   const [formDescription, setFormDescription] = useState<string>('');
 
+  // Estado de sincronización con Supabase y Modal SQL
+  const [isSupabaseOnline] = useState<boolean>(() => isSupabaseConfigured());
+  const [isSyncingWithSupabase, setIsSyncingWithSupabase] = useState<boolean>(false);
+  const [syncFeedback, setSyncFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+  const [isSqlModalOpen, setIsSqlModalOpen] = useState<boolean>(false);
+  const [sqlMode, setSqlMode] = useState<'migration' | 'recreate'>('migration');
+  const [copiedSql, setCopiedSql] = useState<boolean>(false);
+
+  // Sincronización inicial automática al montar el componente
+  useEffect(() => {
+    let isMounted = true;
+    const loadRemoteRules = async () => {
+      if (isSupabaseConfigured()) {
+        try {
+          const remoteRules = await ProjectScheduleService.fetchRulesFromSupabase();
+          if (isMounted && remoteRules && remoteRules.length > 0) {
+            setRules(remoteRules);
+          }
+        } catch (err) {
+          console.warn('No se pudieron obtener las reglas remotas de Supabase:', err);
+        }
+      }
+    };
+    loadRemoteRules();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Cálculo de avances y consolidación jerárquica
   const summary = useMemo(() => {
     return ProjectScheduleService.calculateScheduleProgress(photos, tasks, rules);
   }, [photos, tasks, rules]);
+
+  // Manejador para sincronizar reglas a Supabase
+  const handleSyncToSupabase = async () => {
+    if (!isSupabaseConfigured()) {
+      setSyncFeedback({
+        type: 'error',
+        message: 'Supabase no está configurado. Por favor verifique sus credenciales en el módulo de Configuración.',
+      });
+      return;
+    }
+    setIsSyncingWithSupabase(true);
+    setSyncFeedback({ type: 'info', message: 'Sincronizando reglas con la tabla project_mapping_rules en Supabase...' });
+    try {
+      const result = await ProjectScheduleService.syncRulesWithSupabase(rules);
+      if (result.success > 0 && result.failed === 0) {
+        setSyncFeedback({
+          type: 'success',
+          message: `¡Éxito! ${result.success} reglas de mapeo sincronizadas en la tabla public.project_mapping_rules de Supabase.`,
+        });
+      } else {
+        setSyncFeedback({
+          type: 'error',
+          message: `Se detectaron ${result.failed} reglas sin sincronizar. Asegúrate de haber ejecutado el script SQL en Supabase.`,
+        });
+      }
+    } catch (err: any) {
+      setSyncFeedback({
+        type: 'error',
+        message: `Error al conectar con Supabase: ${err?.message || 'Fallo de red'}.`,
+      });
+    } finally {
+      setIsSyncingWithSupabase(false);
+      setTimeout(() => setSyncFeedback(null), 6000);
+    }
+  };
+
+  // Manejador para recargar reglas desde Supabase
+  const handleFetchFromSupabase = async () => {
+    if (!isSupabaseConfigured()) {
+      setSyncFeedback({
+        type: 'error',
+        message: 'Supabase no está configurado en este momento.',
+      });
+      return;
+    }
+    setIsSyncingWithSupabase(true);
+    try {
+      const remoteRules = await ProjectScheduleService.fetchRulesFromSupabase();
+      if (remoteRules && remoteRules.length > 0) {
+        setRules(remoteRules);
+        setSyncFeedback({
+          type: 'success',
+          message: `Se descargaron y sincronizaron ${remoteRules.length} reglas desde Supabase.`,
+        });
+      } else {
+        setSyncFeedback({
+          type: 'info',
+          message: 'No se encontraron reglas en Supabase o la tabla está vacía. Use "Sincronizar" para crearlas.',
+        });
+      }
+    } catch (err: any) {
+      setSyncFeedback({
+        type: 'error',
+        message: `Error al consultar Supabase: ${err?.message || 'Error de red'}.`,
+      });
+    } finally {
+      setIsSyncingWithSupabase(false);
+      setTimeout(() => setSyncFeedback(null), 6000);
+    }
+  };
+
+  // Copiar SQL para Supabase al portapapeles
+  const handleCopySql = () => {
+    const sql = ProjectScheduleService.generateSqlSchema(rules, {
+      cleanRecreate: sqlMode === 'recreate',
+    });
+    navigator.clipboard.writeText(sql);
+    setCopiedSql(true);
+    setTimeout(() => setCopiedSql(false), 3000);
+  };
 
   // Manejador para abrir modal de edición de regla
   const handleOpenRuleModal = (ruleToEdit?: ProjectMappingRule) => {
@@ -718,25 +828,113 @@ export const ProjectScheduleView: React.FC<ProjectScheduleViewProps> = ({
       {/* PESTAÑA 2: TABLA DE MAPEO Y CONFIGURACIÓN (100% DINÁMICA) */}
       {activeTab === 'MAPEO' && (
         <div className="space-y-4">
-          <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-blue-900">
-            <div className="flex items-start gap-2.5">
-              <span className="material-symbols-outlined text-[20px] text-blue-600 shrink-0">info</span>
-              <div>
-                <strong className="block text-sm font-bold text-blue-950">
-                  Arquitectura Desacoplada: Mapeo sin Modificar Código
-                </strong>
-                <span>
-                  Cada regla asocia una actividad de <strong>NIVEL 4</strong> de Microsoft Project (mediante su ID exclusivo) con los elementos físicos del plano según su tipo, red y sector. Si surge una nueva actividad o sector (ej. Intersección 3 con ID 35), simplemente agréguela a esta tabla.
-                </span>
+          {/* Banner principal con controles de Supabase */}
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3.5">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center shrink-0 border border-blue-100">
+                  <span className="material-symbols-outlined text-[22px]">database</span>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                      Reglas de Mapeo en Supabase (public.project_mapping_rules)
+                    </h3>
+                    {isSupabaseOnline ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        Supabase Conectado
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                        Modo Local (Cache)
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Vinculación dinámica entre actividades de <strong>Nivel 4</strong> de MS Project y los elementos físicos de obra por sector, red y tipo.
+                  </p>
+                </div>
+              </div>
+
+              {/* Botones de acción */}
+              <div className="flex items-center gap-2 flex-wrap self-start lg:self-auto">
+                <button
+                  type="button"
+                  onClick={handleSyncToSupabase}
+                  disabled={isSyncingWithSupabase}
+                  className="px-3 py-1.5 rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition shadow-2xs"
+                  title="Sincronizar y guardar todas las reglas en la tabla project_mapping_rules de Supabase"
+                >
+                  <span className="material-symbols-outlined text-[16px]">
+                    {isSyncingWithSupabase ? 'sync' : 'cloud_upload'}
+                  </span>
+                  <span>{isSyncingWithSupabase ? 'Sincronizando...' : 'Sincronizar a Supabase'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleFetchFromSupabase}
+                  disabled={isSyncingWithSupabase}
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition shadow-2xs"
+                  title="Recargar reglas de mapeo desde Supabase"
+                >
+                  <span className="material-symbols-outlined text-[16px]">cloud_download</span>
+                  <span>Cargar de Supabase</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsSqlModalOpen(true)}
+                  className="px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition shadow-2xs"
+                  title="Ver script SQL para crear la tabla y cargar datos en Supabase SQL Editor"
+                >
+                  <span className="material-symbols-outlined text-[16px]">terminal</span>
+                  <span>Script SQL</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleOpenRuleModal()}
+                  className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1 cursor-pointer transition shadow-2xs"
+                >
+                  <span className="material-symbols-outlined text-[16px]">add</span>
+                  <span>Agregar Regla</span>
+                </button>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => handleOpenRuleModal()}
-              className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shrink-0 self-start sm:self-auto cursor-pointer shadow-2xs"
-            >
-              + Agregar Regla
-            </button>
+
+            {/* Mensaje de retroalimentación de sincronización */}
+            {syncFeedback && (
+              <div
+                className={`p-3 rounded-xl border text-xs flex items-start justify-between gap-2 transition-all ${
+                  syncFeedback.type === 'success'
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                    : syncFeedback.type === 'error'
+                    ? 'bg-rose-50 border-rose-200 text-rose-900'
+                    : 'bg-blue-50 border-blue-200 text-blue-900'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[18px]">
+                    {syncFeedback.type === 'success'
+                      ? 'check_circle'
+                      : syncFeedback.type === 'error'
+                      ? 'error'
+                      : 'info'}
+                  </span>
+                  <span className="font-medium">{syncFeedback.message}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSyncFeedback(null)}
+                  className="text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
+                >
+                  <span className="material-symbols-outlined text-[14px]">close</span>
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
@@ -1303,6 +1501,129 @@ export const ProjectScheduleView: React.FC<ProjectScheduleViewProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* MODAL 3: SCRIPT SQL PARA SUPABASE */}
+      {isSqlModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in duration-200">
+            {/* Cabecera del Modal */}
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0 border border-indigo-100">
+                  <span className="material-symbols-outlined text-[20px]">terminal</span>
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm sm:text-base">
+                    Script SQL para Supabase (Tabla project_mapping_rules)
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Copia y ejecuta este script en el SQL Editor de tu proyecto Supabase
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSqlModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            {/* Contenido del Modal */}
+            <div className="p-4 sm:p-5 space-y-3.5 overflow-y-auto flex-1">
+              {/* Alerta explicativa del error corregido */}
+              <div className="p-3 bg-amber-50/90 rounded-xl border border-amber-200 text-xs text-amber-900 space-y-1">
+                <div className="font-bold flex items-center gap-1.5 text-amber-950">
+                  <span className="material-symbols-outlined text-[17px] text-amber-600">build_circle</span>
+                  <span>Solución para errores de tipo UUID (&quot;invalid input syntax for type uuid&quot;) o columna faltante</span>
+                </div>
+                <p className="text-[11.5px] text-amber-800 leading-relaxed">
+                  Si tu tabla se creó previamente con la columna <code className="font-mono font-bold bg-amber-100 px-1 py-0.5 rounded text-amber-950">id</code> como <code className="font-mono font-bold bg-amber-100 px-1 py-0.5 rounded text-amber-950">uuid</code> o sin <code className="font-mono font-bold bg-amber-100 px-1 py-0.5 rounded text-amber-950">description</code>, este script incluye un bloque <code className="font-mono text-[11px] bg-white/70 px-1 py-0.5 rounded border border-amber-200">DO $$ ... END $$</code> que convierte automáticamente <code className="font-mono">id</code> a <code className="font-mono">TEXT</code> y añade las columnas faltantes sin perder tus datos.
+                </p>
+              </div>
+
+              {/* Selector de modo */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 bg-slate-100/80 rounded-xl border border-slate-200">
+                <span className="text-xs font-semibold text-slate-700">Modo de Ejecución SQL:</span>
+                <div className="flex items-center gap-1.5 bg-white p-1 rounded-lg border border-slate-200 shadow-2xs">
+                  <button
+                    type="button"
+                    onClick={() => setSqlMode('migration')}
+                    className={`px-3 py-1 rounded-md text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
+                      sqlMode === 'migration'
+                        ? 'bg-blue-600 text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[14px]">published_with_changes</span>
+                    <span>Migración Segura (Conserva datos)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSqlMode('recreate')}
+                    className={`px-3 py-1 rounded-md text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
+                      sqlMode === 'recreate'
+                        ? 'bg-rose-600 text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[14px]">refresh</span>
+                    <span>Recrear Tabla Limpia (DROP &amp; CREATE)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Instrucciones de ejecución */}
+              <div className="p-3 bg-blue-50/80 rounded-xl border border-blue-200 text-xs text-blue-900 space-y-1">
+                <div className="font-bold flex items-center gap-1.5 text-blue-950">
+                  <span className="material-symbols-outlined text-[16px]">help</span>
+                  Instrucciones para ejecutar en Supabase:
+                </div>
+                <ol className="list-decimal list-inside space-y-0.5 text-[11px] text-blue-800">
+                  <li>Haz clic en el botón <strong>&quot;Copiar Script SQL&quot;</strong> abajo.</li>
+                  <li>Abre tu consola de <strong>Supabase</strong> &gt; sección <strong>SQL Editor</strong> &gt; <em>New Query</em>.</li>
+                  <li>Pega el código completo y presiona <strong>RUN</strong>.</li>
+                  <li>Vuelve a esta pantalla y haz clic en <strong>&quot;Sincronizar a Supabase&quot;</strong>.</li>
+                </ol>
+              </div>
+
+              <div className="relative">
+                <pre className="p-4 bg-slate-900 text-slate-100 rounded-xl font-mono text-xs overflow-x-auto max-h-[340px] leading-relaxed select-all">
+                  {ProjectScheduleService.generateSqlSchema(rules, {
+                    cleanRecreate: sqlMode === 'recreate',
+                  })}
+                </pre>
+              </div>
+            </div>
+
+            {/* Pie del Modal */}
+            <div className="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/80 gap-3">
+              <span className="text-[11px] text-slate-500">
+                {rules.length} reglas incluidas en el script con DDL, índices y RLS
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsSqlModalOpen(false)}
+                  className="px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 cursor-pointer"
+                >
+                  Cerrar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopySql}
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <span className="material-symbols-outlined text-[16px]">
+                    {copiedSql ? 'check' : 'content_copy'}
+                  </span>
+                  <span>{copiedSql ? '¡Copiado al Portapapeles!' : 'Copiar Script SQL'}</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

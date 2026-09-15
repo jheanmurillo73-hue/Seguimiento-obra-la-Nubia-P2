@@ -29,6 +29,7 @@ import {
   encodeProgressInFieldNotes,
   decodeProgressFromFieldNotes,
 } from '../lib/elementProgressStorage';
+import { ProjectMappingRule } from '../types/projectSchedule';
 
 const isElementType = (value: unknown): value is ElementType =>
   value === 'caja' || value === 'camara' || value === 'tuberia' || value === 'electrico';
@@ -948,6 +949,280 @@ export const supabaseService = {
     }
   },
 
+  // ============================================================
+  // TABLA DE MAPEO DE CRONOGRAMA (project_mapping_rules)
+  // ============================================================
+
+  fetchMappingRules: async (): Promise<ProjectMappingRule[] | null> => {
+    const client = getSupabaseClient();
+    if (!client || !isSupabaseConfigured()) return null;
+
+    try {
+      const { data, error } = await client
+        .from('project_mapping_rules')
+        .select('*')
+        .order('project_unique_id', { ascending: true });
+
+      if (error) {
+        console.warn('Error al obtener reglas de mapeo desde Supabase:', error.message);
+        return null;
+      }
+
+      if (!data || !Array.isArray(data)) return null;
+
+      return data.map((row: any): ProjectMappingRule => ({
+        id: row.id,
+        projectUniqueId: Number(row.project_unique_id),
+        capitulo: row.capitulo || 'OBRAS CIVILES',
+        nivelEsquema: (row.nivel_esquema as 4) || 4,
+        actividadProject: row.actividad_project,
+        tipoElemento: row.tipo_elemento,
+        tipoRed: row.tipo_red,
+        sectorCode: row.sector_code,
+        criterioCalculo: row.criterio_calculo,
+        pesoPonderado: Number(row.peso_ponderado) || 1.0,
+        isActive: row.is_active ?? true,
+        createdAt: row.created_at || new Date().toISOString(),
+        updatedAt: row.updated_at || new Date().toISOString(),
+        description: row.description || '',
+      }));
+    } catch (err) {
+      console.warn('Excepción de red al consultar project_mapping_rules:', err);
+      return null;
+    }
+  },
+
+  saveMappingRule: async (rule: ProjectMappingRule): Promise<boolean> => {
+    const client = getSupabaseClient();
+    if (!client || !isSupabaseConfigured()) return false;
+
+    try {
+      const { error } = await client.from('project_mapping_rules').upsert({
+        id: rule.id,
+        project_unique_id: rule.projectUniqueId,
+        capitulo: rule.capitulo,
+        nivel_esquema: rule.nivelEsquema,
+        actividad_project: rule.actividadProject,
+        tipo_elemento: rule.tipoElemento,
+        tipo_red: rule.tipoRed,
+        sector_code: rule.sectorCode,
+        criterio_calculo: rule.criterioCalculo,
+        peso_ponderado: rule.pesoPonderado,
+        is_active: rule.isActive,
+        description: rule.description || null,
+        updated_at: new Date().toISOString(),
+      });
+
+      if (error) {
+        console.warn('Error al guardar regla de mapeo en Supabase:', error.message);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.warn('Excepción de red al guardar regla de mapeo en Supabase:', err);
+      return false;
+    }
+  },
+
+  bulkSyncMappingRules: async (rules: ProjectMappingRule[]): Promise<{ success: number; failed: number }> => {
+    const client = getSupabaseClient();
+    if (!client || !isSupabaseConfigured()) {
+      return { success: 0, failed: rules.length };
+    }
+
+    try {
+      const records = rules.map((rule) => ({
+        id: rule.id,
+        project_unique_id: rule.projectUniqueId,
+        capitulo: rule.capitulo,
+        nivel_esquema: rule.nivelEsquema,
+        actividad_project: rule.actividadProject,
+        tipo_elemento: rule.tipoElemento,
+        tipo_red: rule.tipoRed,
+        sector_code: rule.sectorCode,
+        criterio_calculo: rule.criterioCalculo,
+        peso_ponderado: rule.pesoPonderado,
+        is_active: rule.isActive,
+        description: rule.description || null,
+        updated_at: new Date().toISOString(),
+      }));
+
+      const { error } = await client
+        .from('project_mapping_rules')
+        .upsert(records, { onConflict: 'id' });
+
+      if (error) {
+        console.warn('Error al sincronizar reglas de mapeo en masa en Supabase:', error.message);
+        return { success: 0, failed: rules.length };
+      }
+
+      return { success: rules.length, failed: 0 };
+    } catch (err) {
+      console.warn('Excepción de red al sincronizar reglas de mapeo en Supabase:', err);
+      return { success: 0, failed: rules.length };
+    }
+  },
+
+  deleteMappingRule: async (ruleId: string): Promise<boolean> => {
+    const client = getSupabaseClient();
+    if (!client || !isSupabaseConfigured()) return false;
+
+    try {
+      const { error } = await client.from('project_mapping_rules').delete().eq('id', ruleId);
+      if (error) {
+        console.warn('Error al eliminar regla de mapeo en Supabase:', error.message);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.warn('Excepción de red al eliminar regla de mapeo en Supabase:', err);
+      return false;
+    }
+  },
+
+  generateMappingRulesSql: (rules?: ProjectMappingRule[], options?: { cleanRecreate?: boolean }): string => {
+    const rulesList = rules && rules.length > 0 ? rules : [
+      { id: 'rule-7', projectUniqueId: 7, capitulo: 'OBRAS CIVILES', nivelEsquema: 4, actividadProject: 'Canalizaciones', tipoElemento: 'tuberia', tipoRed: 'TODAS', sectorCode: 'I2', criterioCalculo: 'metros_lineales', pesoPonderado: 1.0, isActive: true, createdAt: '2026-09-10T09:00:00Z', updatedAt: '2026-09-10T09:00:00Z', description: 'Tramos de canalizaciones y ductos en Intersección 2' },
+      { id: 'rule-8', projectUniqueId: 8, capitulo: 'OBRAS CIVILES', nivelEsquema: 4, actividadProject: 'Construccion de cajas BT', tipoElemento: 'camara', tipoRed: 'BT', sectorCode: 'I2', criterioCalculo: 'unidades', pesoPonderado: 1.0, isActive: true, createdAt: '2026-09-10T09:00:00Z', updatedAt: '2026-09-10T09:00:00Z', description: 'Cajas y cámaras de Baja Tensión en Intersección 2' },
+      { id: 'rule-9', projectUniqueId: 9, capitulo: 'OBRAS CIVILES', nivelEsquema: 4, actividadProject: 'Construccion cajas MT', tipoElemento: 'camara', tipoRed: 'MT', sectorCode: 'I2', criterioCalculo: 'unidades', pesoPonderado: 1.0, isActive: true, createdAt: '2026-09-10T09:00:00Z', updatedAt: '2026-09-10T09:00:00Z', description: 'Cajas y cámaras de Media Tensión en Intersección 2' },
+      { id: 'rule-10', projectUniqueId: 10, capitulo: 'OBRAS CIVILES', nivelEsquema: 4, actividadProject: 'Construccion cajas Datos', tipoElemento: 'camara', tipoRed: 'DATOS', sectorCode: 'I2', criterioCalculo: 'unidades', pesoPonderado: 1.0, isActive: true, createdAt: '2026-09-10T09:00:00Z', updatedAt: '2026-09-10T09:00:00Z', description: 'Cajas y cámaras de Datos/Control en Intersección 2' },
+      { id: 'rule-12', projectUniqueId: 12, capitulo: 'OBRAS CIVILES', nivelEsquema: 4, actividadProject: 'Canalizaciones', tipoElemento: 'tuberia', tipoRed: 'TODAS', sectorCode: 'I1', criterioCalculo: 'metros_lineales', pesoPonderado: 1.0, isActive: true, createdAt: '2026-09-10T09:00:00Z', updatedAt: '2026-09-10T09:00:00Z', description: 'Tramos de canalizaciones y ductos en Intersección 1' },
+      { id: 'rule-13', projectUniqueId: 13, capitulo: 'OBRAS CIVILES', nivelEsquema: 4, actividadProject: 'Construccion de cajas BT', tipoElemento: 'camara', tipoRed: 'BT', sectorCode: 'I1', criterioCalculo: 'unidades', pesoPonderado: 1.0, isActive: true, createdAt: '2026-09-10T09:00:00Z', updatedAt: '2026-09-10T09:00:00Z', description: 'Cajas y cámaras de Baja Tensión en Intersección 1' },
+      { id: 'rule-14', projectUniqueId: 14, capitulo: 'OBRAS CIVILES', nivelEsquema: 4, actividadProject: 'Construccion cajas MT', tipoElemento: 'camara', tipoRed: 'MT', sectorCode: 'I1', criterioCalculo: 'unidades', pesoPonderado: 1.0, isActive: true, createdAt: '2026-09-10T09:00:00Z', updatedAt: '2026-09-10T09:00:00Z', description: 'Cajas y cámaras de Media Tensión en Intersección 1' },
+      { id: 'rule-15', projectUniqueId: 15, capitulo: 'OBRAS CIVILES', nivelEsquema: 4, actividadProject: 'Construccion cajas Datos', tipoElemento: 'camara', tipoRed: 'DATOS', sectorCode: 'I1', criterioCalculo: 'unidades', pesoPonderado: 1.0, isActive: true, createdAt: '2026-09-10T09:00:00Z', updatedAt: '2026-09-10T09:00:00Z', description: 'Cajas y cámaras de Datos/Control en Intersección 1' },
+      { id: 'rule-17', projectUniqueId: 17, capitulo: 'OBRAS CIVILES', nivelEsquema: 4, actividadProject: 'Canalizaciones', tipoElemento: 'tuberia', tipoRed: 'TODAS', sectorCode: 'TRONCAL', criterioCalculo: 'metros_lineales', pesoPonderado: 1.0, isActive: true, createdAt: '2026-09-10T09:00:00Z', updatedAt: '2026-09-10T09:00:00Z', description: 'Tramos de canalizaciones en Troncal Principal' },
+      { id: 'rule-18', projectUniqueId: 18, capitulo: 'OBRAS CIVILES', nivelEsquema: 4, actividadProject: 'Construccion de cajas BT', tipoElemento: 'camara', tipoRed: 'BT', sectorCode: 'TRONCAL', criterioCalculo: 'unidades', pesoPonderado: 1.0, isActive: true, createdAt: '2026-09-10T09:00:00Z', updatedAt: '2026-09-10T09:00:00Z', description: 'Cajas y cámaras de Baja Tensión en Troncal Principal' },
+      { id: 'rule-19', projectUniqueId: 19, capitulo: 'OBRAS CIVILES', nivelEsquema: 4, actividadProject: 'Construccion cajas MT', tipoElemento: 'camara', tipoRed: 'MT', sectorCode: 'TRONCAL', criterioCalculo: 'unidades', pesoPonderado: 1.0, isActive: true, createdAt: '2026-09-10T09:00:00Z', updatedAt: '2026-09-10T09:00:00Z', description: 'Cajas y cámaras de Media Tensión en Troncal Principal' },
+      { id: 'rule-20', projectUniqueId: 20, capitulo: 'OBRAS CIVILES', nivelEsquema: 4, actividadProject: 'Construccion cajas Datos', tipoElemento: 'camara', tipoRed: 'DATOS', sectorCode: 'TRONCAL', criterioCalculo: 'unidades', pesoPonderado: 1.0, isActive: true, createdAt: '2026-09-10T09:00:00Z', updatedAt: '2026-09-10T09:00:00Z', description: 'Cajas y cámaras de Datos/Control en Troncal Principal' },
+    ];
+
+    const valuesSql = rulesList
+      .map(
+        (r) =>
+          `  ('${r.id}', ${r.projectUniqueId}, '${r.capitulo.replace(/'/g, "''")}', ${r.nivelEsquema}, '${r.actividadProject.replace(/'/g, "''")}', '${r.tipoElemento}', '${r.tipoRed}', '${r.sectorCode}', '${r.criterioCalculo}', ${r.pesoPonderado}, ${r.isActive ? 'true' : 'false'}, ${r.description ? `'${r.description.replace(/'/g, "''")}'` : 'NULL'})`
+      )
+      .join(',\n');
+
+    const dropTableSql = options?.cleanRecreate
+      ? `DROP TABLE IF EXISTS public.project_mapping_rules CASCADE;\n\n`
+      : `-- Si deseas recrear la tabla desde cero eliminando datos antiguos, descomenta la siguiente línea:
+-- DROP TABLE IF EXISTS public.project_mapping_rules CASCADE;
+
+`;
+
+    return `-- ============================================================
+-- TABLA DE MAPEO DE CRONOGRAMA EN SUPABASE (POSTGRESQL)
+-- Vinculación dinámica entre Microsoft Project Nivel 4 y Seguimiento Físico
+-- ============================================================
+
+${dropTableSql}-- 1. Crear tabla de reglas de mapeo si no existe
+CREATE TABLE IF NOT EXISTS public.project_mapping_rules (
+  id TEXT PRIMARY KEY,
+  project_unique_id INTEGER NOT NULL,
+  capitulo TEXT NOT NULL DEFAULT 'OBRAS CIVILES',
+  nivel_esquema INTEGER NOT NULL DEFAULT 4,
+  actividad_project TEXT NOT NULL,
+  tipo_elemento TEXT NOT NULL CHECK (tipo_elemento IN ('tuberia', 'camara', 'caja', 'todos')),
+  tipo_red TEXT NOT NULL CHECK (tipo_red IN ('MT', 'BT', 'DATOS', 'TODAS')),
+  sector_code TEXT NOT NULL CHECK (sector_code IN ('I1', 'I2', 'TRONCAL', 'OTRO', 'TODOS')),
+  criterio_calculo TEXT NOT NULL CHECK (criterio_calculo IN ('metros_lineales', 'unidades', 'promedio')),
+  peso_ponderado NUMERIC NOT NULL DEFAULT 1.0,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  description TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+-- 2. Migración automática: asegura que id sea TEXT PRIMARY KEY (por si se creó como UUID por defecto) y existan todas las columnas
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+      AND table_name = 'project_mapping_rules' 
+      AND column_name = 'id' 
+      AND data_type = 'uuid'
+  ) THEN
+    ALTER TABLE public.project_mapping_rules DROP CONSTRAINT IF EXISTS project_mapping_rules_pkey CASCADE;
+    ALTER TABLE public.project_mapping_rules ALTER COLUMN id TYPE TEXT USING id::text;
+    ALTER TABLE public.project_mapping_rules ADD PRIMARY KEY (id);
+  END IF;
+END $$;
+
+ALTER TABLE public.project_mapping_rules ADD COLUMN IF NOT EXISTS capitulo TEXT NOT NULL DEFAULT 'OBRAS CIVILES';
+ALTER TABLE public.project_mapping_rules ADD COLUMN IF NOT EXISTS nivel_esquema INTEGER NOT NULL DEFAULT 4;
+ALTER TABLE public.project_mapping_rules ADD COLUMN IF NOT EXISTS actividad_project TEXT;
+ALTER TABLE public.project_mapping_rules ADD COLUMN IF NOT EXISTS tipo_elemento TEXT;
+ALTER TABLE public.project_mapping_rules ADD COLUMN IF NOT EXISTS tipo_red TEXT;
+ALTER TABLE public.project_mapping_rules ADD COLUMN IF NOT EXISTS sector_code TEXT;
+ALTER TABLE public.project_mapping_rules ADD COLUMN IF NOT EXISTS criterio_calculo TEXT;
+ALTER TABLE public.project_mapping_rules ADD COLUMN IF NOT EXISTS peso_ponderado NUMERIC NOT NULL DEFAULT 1.0;
+ALTER TABLE public.project_mapping_rules ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE public.project_mapping_rules ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE public.project_mapping_rules ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now());
+ALTER TABLE public.project_mapping_rules ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now());
+
+-- 3. Índices de rendimiento
+CREATE INDEX IF NOT EXISTS idx_project_mapping_rules_unique_id ON public.project_mapping_rules (project_unique_id);
+CREATE INDEX IF NOT EXISTS idx_project_mapping_rules_sector ON public.project_mapping_rules (sector_code);
+CREATE INDEX IF NOT EXISTS idx_project_mapping_rules_active ON public.project_mapping_rules (is_active);
+
+-- 4. Habilitar Seguridad a Nivel de Fila (RLS)
+ALTER TABLE public.project_mapping_rules ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Acceso total a reglas de mapeo" ON public.project_mapping_rules;
+CREATE POLICY "Acceso total a reglas de mapeo" ON public.project_mapping_rules FOR ALL
+USING (true)
+WITH CHECK (true);
+
+-- 5. Insertar o actualizar las reglas iniciales
+INSERT INTO public.project_mapping_rules (
+  id,
+  project_unique_id,
+  capitulo,
+  nivel_esquema,
+  actividad_project,
+  tipo_elemento,
+  tipo_red,
+  sector_code,
+  criterio_calculo,
+  peso_ponderado,
+  is_active,
+  description
+) VALUES
+${valuesSql}
+ON CONFLICT (id) DO UPDATE SET
+  project_unique_id = EXCLUDED.project_unique_id,
+  capitulo = EXCLUDED.capitulo,
+  nivel_esquema = EXCLUDED.nivel_esquema,
+  actividad_project = EXCLUDED.actividad_project,
+  tipo_elemento = EXCLUDED.tipo_elemento,
+  tipo_red = EXCLUDED.tipo_red,
+  sector_code = EXCLUDED.sector_code,
+  criterio_calculo = EXCLUDED.criterio_calculo,
+  peso_ponderado = EXCLUDED.peso_ponderado,
+  is_active = EXCLUDED.is_active,
+  description = EXCLUDED.description,
+  updated_at = timezone('utc'::text, now());
+
+-- 6. Vista analítica resumen por sector y red
+CREATE OR REPLACE VIEW public.v_resumen_reglas_mapeo AS
+SELECT
+  r.sector_code,
+  r.tipo_red,
+  r.tipo_elemento,
+  COUNT(*) AS total_reglas,
+  SUM(CASE WHEN r.is_active THEN 1 ELSE 0 END) AS reglas_activas,
+  ARRAY_AGG(r.actividad_project ORDER BY r.project_unique_id) AS actividades
+FROM public.project_mapping_rules r
+GROUP BY r.sector_code, r.tipo_red, r.tipo_elemento
+ORDER BY r.sector_code, r.tipo_red;
+
+-- 7. Recargar caché de PostgREST
+NOTIFY pgrst, 'reload schema';
+`;
+  },
+
   // Returns the complete SQL creation script for Supabase SQL Editor
   getSupabaseSchemaSql: (): string => {
     return `-- ============================================================
@@ -1656,6 +1931,85 @@ CREATE TABLE IF NOT EXISTS public.app_settings (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
 
+-- 6. TABLA DE REGLAS DE MAPEO DE CRONOGRAMA PROJECT (project_mapping_rules)
+CREATE TABLE IF NOT EXISTS public.project_mapping_rules (
+  id TEXT PRIMARY KEY,
+  project_unique_id INTEGER NOT NULL,
+  capitulo TEXT NOT NULL DEFAULT 'OBRAS CIVILES',
+  nivel_esquema INTEGER NOT NULL DEFAULT 4,
+  actividad_project TEXT NOT NULL,
+  tipo_elemento TEXT NOT NULL CHECK (tipo_elemento IN ('tuberia', 'camara', 'caja', 'todos')),
+  tipo_red TEXT NOT NULL CHECK (tipo_red IN ('MT', 'BT', 'DATOS', 'TODAS')),
+  sector_code TEXT NOT NULL CHECK (sector_code IN ('I1', 'I2', 'TRONCAL', 'OTRO', 'TODOS')),
+  criterio_calculo TEXT NOT NULL CHECK (criterio_calculo IN ('metros_lineales', 'unidades', 'promedio')),
+  peso_ponderado NUMERIC NOT NULL DEFAULT 1.0,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  description TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+-- Asegurar que id sea TEXT PRIMARY KEY (por si se creó como UUID por defecto) y existan todas las columnas
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+      AND table_name = 'project_mapping_rules' 
+      AND column_name = 'id' 
+      AND data_type = 'uuid'
+  ) THEN
+    ALTER TABLE public.project_mapping_rules DROP CONSTRAINT IF EXISTS project_mapping_rules_pkey CASCADE;
+    ALTER TABLE public.project_mapping_rules ALTER COLUMN id TYPE TEXT USING id::text;
+    ALTER TABLE public.project_mapping_rules ADD PRIMARY KEY (id);
+  END IF;
+END $$;
+
+ALTER TABLE public.project_mapping_rules ADD COLUMN IF NOT EXISTS capitulo TEXT NOT NULL DEFAULT 'OBRAS CIVILES';
+ALTER TABLE public.project_mapping_rules ADD COLUMN IF NOT EXISTS nivel_esquema INTEGER NOT NULL DEFAULT 4;
+ALTER TABLE public.project_mapping_rules ADD COLUMN IF NOT EXISTS actividad_project TEXT;
+ALTER TABLE public.project_mapping_rules ADD COLUMN IF NOT EXISTS tipo_elemento TEXT;
+ALTER TABLE public.project_mapping_rules ADD COLUMN IF NOT EXISTS tipo_red TEXT;
+ALTER TABLE public.project_mapping_rules ADD COLUMN IF NOT EXISTS sector_code TEXT;
+ALTER TABLE public.project_mapping_rules ADD COLUMN IF NOT EXISTS criterio_calculo TEXT;
+ALTER TABLE public.project_mapping_rules ADD COLUMN IF NOT EXISTS peso_ponderado NUMERIC NOT NULL DEFAULT 1.0;
+ALTER TABLE public.project_mapping_rules ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE public.project_mapping_rules ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE public.project_mapping_rules ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now());
+ALTER TABLE public.project_mapping_rules ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now());
+
+-- Insertar reglas iniciales de mapeo (Intersección 1, Intersección 2, Troncal)
+INSERT INTO public.project_mapping_rules (
+  id, project_unique_id, capitulo, nivel_esquema, actividad_project,
+  tipo_elemento, tipo_red, sector_code, criterio_calculo, peso_ponderado,
+  is_active, description
+) VALUES
+  ('rule-7', 7, 'OBRAS CIVILES', 4, 'Canalizaciones', 'tuberia', 'TODAS', 'I2', 'metros_lineales', 1.0, true, 'Tramos de canalizaciones y ductos en Intersección 2'),
+  ('rule-8', 8, 'OBRAS CIVILES', 4, 'Construccion de cajas BT', 'camara', 'BT', 'I2', 'unidades', 1.0, true, 'Cajas y cámaras de Baja Tensión en Intersección 2'),
+  ('rule-9', 9, 'OBRAS CIVILES', 4, 'Construccion cajas MT', 'camara', 'MT', 'I2', 'unidades', 1.0, true, 'Cajas y cámaras de Media Tensión en Intersección 2'),
+  ('rule-10', 10, 'OBRAS CIVILES', 4, 'Construccion cajas Datos', 'camara', 'DATOS', 'I2', 'unidades', 1.0, true, 'Cajas y cámaras de Datos/Control en Intersección 2'),
+  ('rule-12', 12, 'OBRAS CIVILES', 4, 'Canalizaciones', 'tuberia', 'TODAS', 'I1', 'metros_lineales', 1.0, true, 'Tramos de canalizaciones y ductos en Intersección 1'),
+  ('rule-13', 13, 'OBRAS CIVILES', 4, 'Construccion de cajas BT', 'camara', 'BT', 'I1', 'unidades', 1.0, true, 'Cajas y cámaras de Baja Tensión en Intersección 1'),
+  ('rule-14', 14, 'OBRAS CIVILES', 4, 'Construccion cajas MT', 'camara', 'MT', 'I1', 'unidades', 1.0, true, 'Cajas y cámaras de Media Tensión en Intersección 1'),
+  ('rule-15', 15, 'OBRAS CIVILES', 4, 'Construccion cajas Datos', 'camara', 'DATOS', 'I1', 'unidades', 1.0, true, 'Cajas y cámaras de Datos/Control en Intersección 1'),
+  ('rule-17', 17, 'OBRAS CIVILES', 4, 'Canalizaciones', 'tuberia', 'TODAS', 'TRONCAL', 'metros_lineales', 1.0, true, 'Tramos de canalizaciones en Troncal Principal'),
+  ('rule-18', 18, 'OBRAS CIVILES', 4, 'Construccion de cajas BT', 'camara', 'BT', 'TRONCAL', 'unidades', 1.0, true, 'Cajas y cámaras de Baja Tensión en Troncal Principal'),
+  ('rule-19', 19, 'OBRAS CIVILES', 4, 'Construccion cajas MT', 'camara', 'MT', 'TRONCAL', 'unidades', 1.0, true, 'Cajas y cámaras de Media Tensión en Troncal Principal'),
+  ('rule-20', 20, 'OBRAS CIVILES', 4, 'Construccion cajas Datos', 'camara', 'DATOS', 'TRONCAL', 'unidades', 1.0, true, 'Cajas y cámaras de Datos/Control en Troncal Principal')
+ON CONFLICT (id) DO UPDATE SET
+  project_unique_id = EXCLUDED.project_unique_id,
+  capitulo = EXCLUDED.capitulo,
+  nivel_esquema = EXCLUDED.nivel_esquema,
+  actividad_project = EXCLUDED.actividad_project,
+  tipo_elemento = EXCLUDED.tipo_elemento,
+  tipo_red = EXCLUDED.tipo_red,
+  sector_code = EXCLUDED.sector_code,
+  criterio_calculo = EXCLUDED.criterio_calculo,
+  peso_ponderado = EXCLUDED.peso_ponderado,
+  is_active = EXCLUDED.is_active,
+  description = EXCLUDED.description,
+  updated_at = timezone('utc'::text, now());
+
 -- ============================================================
 -- ÍNDICES DE RENDIMIENTO (Búsquedas rápidas por fecha, estado y código)
 -- ============================================================
@@ -1669,6 +2023,9 @@ CREATE INDEX IF NOT EXISTS idx_inspection_photos_pipe_network ON public.inspecti
 CREATE INDEX IF NOT EXISTS idx_inspection_photos_element_type ON public.inspection_photos (element_type);
 CREATE INDEX IF NOT EXISTS idx_inspection_photos_inspector_id ON public.inspection_photos (inspector_id);
 CREATE INDEX IF NOT EXISTS idx_activities_created_at ON public.inspection_activities (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_project_mapping_rules_unique_id ON public.project_mapping_rules (project_unique_id);
+CREATE INDEX IF NOT EXISTS idx_project_mapping_rules_sector ON public.project_mapping_rules (sector_code);
+CREATE INDEX IF NOT EXISTS idx_project_mapping_rules_active ON public.project_mapping_rules (is_active);
 
 -- ============================================================
 -- ROW LEVEL SECURITY (RLS) - Acceso a datos
@@ -1678,6 +2035,7 @@ ALTER TABLE public.inspection_photos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.inspection_activities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.inspection_collections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.app_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.project_mapping_rules ENABLE ROW LEVEL SECURITY;
 
 -- Funciones y políticas de acceso por rol y módulo.
 CREATE OR REPLACE FUNCTION public.photovault_is_admin()
@@ -1795,6 +2153,11 @@ DROP POLICY IF EXISTS "Acceso a configuracion por modulo" ON public.app_settings
 CREATE POLICY "Acceso a configuracion por modulo" ON public.app_settings FOR ALL
 USING (public.photovault_can_access_module('settings'))
 WITH CHECK (public.photovault_can_access_module('settings'));
+
+DROP POLICY IF EXISTS "Acceso total a reglas de mapeo" ON public.project_mapping_rules;
+CREATE POLICY "Acceso total a reglas de mapeo" ON public.project_mapping_rules FOR ALL
+USING (true)
+WITH CHECK (true);
 
 -- Restablecimiento administrativo: conserva perfiles, roles, permisos y configuración.
 CREATE OR REPLACE FUNCTION public.reset_inspection_data()

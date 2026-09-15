@@ -548,6 +548,27 @@ export const SupabaseTablesModal: React.FC<SupabaseTablesModalProps> = ({
         { name: 'offline_storage_limit_mb', type: 'INTEGER', constraints: 'DEFAULT 500', description: 'Límite de memoria caché en MB' },
       ],
     },
+    project_mapping_rules: {
+      name: 'project_mapping_rules (Tabla de Mapeo)',
+      description: 'Reglas de vinculación entre actividades de Nivel 4 de Microsoft Project y elementos físicos en plano (tuberías, cámaras, redes y sectores).',
+      icon: 'sync_alt',
+      columns: [
+        { name: 'id', type: 'TEXT', constraints: 'PRIMARY KEY', description: 'Identificador único de la regla (ej: rule-7, rule-14)' },
+        { name: 'project_unique_id', type: 'INTEGER', constraints: 'NOT NULL', description: 'ID exclusivo de la actividad en MS Project (Nivel 4)' },
+        { name: 'capitulo', type: 'TEXT', constraints: 'DEFAULT OBRAS CIVILES', description: 'Capítulo presupuestal' },
+        { name: 'nivel_esquema', type: 'INTEGER', constraints: 'DEFAULT 4', description: 'Nivel jerárquico fijo en MS Project' },
+        { name: 'actividad_project', type: 'TEXT', constraints: 'NOT NULL', description: 'Nombre de la actividad en el cronograma' },
+        { name: 'tipo_elemento', type: 'TEXT', constraints: "CHECK ('tuberia', 'camara', 'caja', 'todos')", description: 'Tipo de elemento físico que activa la regla' },
+        { name: 'tipo_red', type: 'TEXT', constraints: "CHECK ('MT', 'BT', 'DATOS', 'TODAS')", description: 'Red técnica asociada a la regla' },
+        { name: 'sector_code', type: 'TEXT', constraints: "CHECK ('I1', 'I2', 'TRONCAL', 'OTRO', 'TODOS')", description: 'Sector físico de la obra' },
+        { name: 'criterio_calculo', type: 'TEXT', constraints: "CHECK ('metros_lineales', 'unidades', 'promedio')", description: 'Método para cuantificar el avance físico' },
+        { name: 'peso_ponderado', type: 'NUMERIC', constraints: 'DEFAULT 1.0', description: 'Ponderador de la actividad' },
+        { name: 'is_active', type: 'BOOLEAN', constraints: 'DEFAULT true', description: 'Regla activa para cálculo de avance' },
+        { name: 'description', type: 'TEXT', constraints: 'NULL', description: 'Descripción o notas de la regla' },
+        { name: 'created_at', type: 'TIMESTAMPTZ', constraints: 'DEFAULT now()', description: 'Fecha de creación' },
+        { name: 'updated_at', type: 'TIMESTAMPTZ', constraints: 'DEFAULT now()', description: 'Última actualización' },
+      ],
+    },
     v_tramos_conduits: {
       name: 'v_tramos_conduits (Vista SQL)',
       description: 'Vista PostgreSQL que desglosa cada ducto de canalización de pipe_conduits en una fila propia clasificada por red (MT, BT o DATOS).',
@@ -1670,6 +1691,11 @@ SELECT * FROM v_camaras_inventario WHERE sector_codigo = 'I1' AND tipo_red = 'MT
                   <div className="p-3 rounded-xl border border-slate-200 bg-slate-50 space-y-1">
                     <div className="font-mono font-bold text-[#004d99]">6. fotos_evidencia</div>
                     <div className="text-[11px] text-[#727782]">id, inspeccion_id, storage_url, created_at</div>
+                  </div>
+
+                  <div className="p-3 rounded-xl border border-blue-200 bg-blue-50/70 space-y-1">
+                    <div className="font-mono font-bold text-[#004d99]">7. project_mapping_rules</div>
+                    <div className="text-[11px] text-[#727782]">id, project_unique_id, actividad_project, tipo_red, sector_code, criterio_calculo</div>
                   </div>
                 </div>
               </div>

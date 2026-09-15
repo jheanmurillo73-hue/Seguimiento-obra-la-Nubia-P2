@@ -12,6 +12,7 @@ import {
   ProjectHierarchySummary,
   ProjectAssignmentConflict,
 } from '../types/projectSchedule';
+import { supabaseService } from './supabaseService';
 
 // Claves de almacenamiento local
 const STORAGE_TASKS_KEY = 'photovault_project_tasks';
@@ -585,7 +586,7 @@ export class ProjectScheduleService {
   }
 
   /**
-   * Cargar reglas de mapeo dinámicas
+   * Cargar reglas de mapeo dinámicas desde cache local (o predeterminadas)
    */
   static getRules(): ProjectMappingRule[] {
     const saved = localStorage.getItem(STORAGE_RULES_KEY);
@@ -603,10 +604,65 @@ export class ProjectScheduleService {
   }
 
   /**
-   * Guardar reglas de mapeo dinámicas
+   * Cargar reglas de mapeo directamente desde Supabase (y actualizar cache local)
+   */
+  static async fetchRulesFromSupabase(): Promise<ProjectMappingRule[] | null> {
+    try {
+      const remoteRules = await supabaseService.fetchMappingRules();
+      if (remoteRules && Array.isArray(remoteRules) && remoteRules.length > 0) {
+        localStorage.setItem(STORAGE_RULES_KEY, JSON.stringify(remoteRules));
+        return remoteRules;
+      }
+      return null;
+    } catch (err) {
+      console.warn('Error fetching rules from Supabase in ProjectScheduleService:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Guardar reglas de mapeo dinámicas localmente y sincronizar en segundo plano con Supabase
    */
   static saveRules(rules: ProjectMappingRule[]): void {
     localStorage.setItem(STORAGE_RULES_KEY, JSON.stringify(rules));
+    // Sincronización asíncrona no bloqueante con Supabase si está disponible
+    supabaseService.bulkSyncMappingRules(rules).catch((err) => {
+      console.warn('Sync rules background failure:', err);
+    });
+  }
+
+  /**
+   * Sincronización explícita completa de reglas a Supabase con reporte de estado
+   */
+  static async syncRulesWithSupabase(rules: ProjectMappingRule[]): Promise<{ success: number; failed: number }> {
+    localStorage.setItem(STORAGE_RULES_KEY, JSON.stringify(rules));
+    return await supabaseService.bulkSyncMappingRules(rules);
+  }
+
+  /**
+   * Guardar o actualizar una sola regla en Supabase y localmente
+   */
+  static async saveSingleRule(rule: ProjectMappingRule): Promise<boolean> {
+    const currentRules = this.getRules();
+    const index = currentRules.findIndex((r) => r.id === rule.id);
+    let updatedRules: ProjectMappingRule[];
+    if (index >= 0) {
+      updatedRules = [...currentRules];
+      updatedRules[index] = rule;
+    } else {
+      updatedRules = [...currentRules, rule];
+    }
+    localStorage.setItem(STORAGE_RULES_KEY, JSON.stringify(updatedRules));
+    return await supabaseService.saveMappingRule(rule);
+  }
+
+  /**
+   * Eliminar una regla de Supabase y de cache local
+   */
+  static async deleteRule(ruleId: string): Promise<boolean> {
+    const currentRules = this.getRules().filter((r) => r.id !== ruleId);
+    localStorage.setItem(STORAGE_RULES_KEY, JSON.stringify(currentRules));
+    return await supabaseService.deleteMappingRule(ruleId);
   }
 
   /**
@@ -614,7 +670,15 @@ export class ProjectScheduleService {
    */
   static resetRules(): ProjectMappingRule[] {
     localStorage.removeItem(STORAGE_RULES_KEY);
+    supabaseService.bulkSyncMappingRules(INITIAL_MAPPING_RULES).catch(() => {});
     return INITIAL_MAPPING_RULES;
+  }
+
+  /**
+   * Generar el script SQL para ejecutar en Supabase SQL Editor
+   */
+  static generateSqlSchema(rules?: ProjectMappingRule[], options?: { cleanRecreate?: boolean }): string {
+    return supabaseService.generateMappingRulesSql(rules || this.getRules(), options);
   }
 
   /**
@@ -647,6 +711,110 @@ export class ProjectScheduleService {
     }
 
     return true;
+  }
+
+  /**
+   * Calcula el avance físico de cada actividad de Nivel 4 promediando el avance
+   * de los elementos asociados (o ponderando por metrajes lineales en canalizaciones),
+   * con una arquitectura escalable lista para incorporar futuros factores de avance ponderado (pesoPonderado).
+   */
+  static calculateLevel4PhysicalProgress(
+    task: ProjectTask,
+    elements: InspectionPhoto[],
+    rule?: ProjectMappingRule
+  ): {
+    realPhysicalProgress: number;
+    metrosPresupuestados: number;
+    metrosEjecutados: number;
+    camarasTerminadas: number;
+    camarasEnProceso: number;
+    camarasNoIniciadas: number;
+  } {
+    let realPhysicalProgress = 0;
+    let metrosPresupuestados = 0;
+    let metrosEjecutados = 0;
+    let camarasTerminadas = 0;
+    let camarasEnProceso = 0;
+    let camarasNoIniciadas = 0;
+
+    if (task.isMilestone) {
+      // Hitos: mantener el porcentaje reportado o 100% si está aprobado
+      realPhysicalProgress = task.percentComplete;
+      return {
+        realPhysicalProgress,
+        metrosPresupuestados,
+        metrosEjecutados,
+        camarasTerminadas,
+        camarasEnProceso,
+        camarasNoIniciadas,
+      };
+    }
+
+    if (elements.length === 0) {
+      return {
+        realPhysicalProgress: 0,
+        metrosPresupuestados,
+        metrosEjecutados,
+        camarasTerminadas,
+        camarasEnProceso,
+        camarasNoIniciadas,
+      };
+    }
+
+    const isPipeline = rule?.tipoElemento === 'tuberia' || elements.some((e) => e.elementType === 'tuberia');
+
+    if (isPipeline) {
+      // Fórmula ponderada por longitud de canalización (metros lineales):
+      // Σ(metros ejecutados) / Σ(metros presupuestados) * 100
+      elements.forEach((p) => {
+        const presup = getConduitPresupuestadoMeters(p);
+        const ejec = getConduitEjecutadoMeters(p);
+        metrosPresupuestados += presup;
+        metrosEjecutados += ejec;
+      });
+
+      if (metrosPresupuestados > 0) {
+        realPhysicalProgress = Math.min(100, Math.round((metrosEjecutados / metrosPresupuestados) * 1000) / 10);
+      } else {
+        // Si no hay metraje detallado, promedio aritmético simple de los porcentajes de cada tramo
+        const sumPct = elements.reduce((acc, p) => acc + getPhotoProgressPercentage(p), 0);
+        realPhysicalProgress = Math.round((sumPct / elements.length) * 10) / 10;
+      }
+    } else {
+      // Fórmula para cámaras / cajas (unidades físicas):
+      // Promedio ponderado del avance de cada elemento asociado.
+      // Estructura escalable: utiliza el peso ponderado de la regla (rule?.pesoPonderado)
+      // y está preparada para ponderadores individuales por elemento o criticidad en futuras versiones.
+      let sumWeightedProgress = 0;
+      let totalWeight = 0;
+      const ruleWeightFactor = rule?.pesoPonderado ?? 1.0;
+
+      elements.forEach((p) => {
+        const pct = getPhotoProgressPercentage(p);
+        // Factor de peso individual por elemento (extensible en el futuro por metadatos del elemento)
+        const elementWeight = 1.0;
+        const combinedWeight = elementWeight * ruleWeightFactor;
+
+        sumWeightedProgress += pct * combinedWeight;
+        totalWeight += combinedWeight;
+
+        if (pct >= 100) camarasTerminadas++;
+        else if (pct > 0) camarasEnProceso++;
+        else camarasNoIniciadas++;
+      });
+
+      const weightedAverage = totalWeight > 0 ? sumWeightedProgress / totalWeight : 0;
+      realPhysicalProgress = Math.round(weightedAverage * 10) / 10;
+    }
+
+    return {
+      realPhysicalProgress,
+      metrosPresupuestados,
+      metrosEjecutados,
+      camarasTerminadas,
+      camarasEnProceso,
+      camarasNoIniciadas,
+    };
   }
 
   /**
@@ -688,7 +856,6 @@ export class ProjectScheduleService {
         unassignedElements.push(photo);
       } else if (matchingRules.length > 1) {
         // Conflicto de asignación: coincide con más de una tarea de Nivel 4
-        // REGLA CRÍTICA: Se reporta el conflicto y NO se suma automáticamente
         conflicts.push({
           photoId: photo.id,
           photoName: photo.name || 'Sin nombre',
@@ -709,62 +876,17 @@ export class ProjectScheduleService {
     let globalMetrosEjecutados = 0;
     let globalMetrosPresupuestados = 0;
 
-    // Calcular avance real para cada actividad de NIVEL 4
+    // Calcular avance real para cada actividad de NIVEL 4 utilizando la función escalable
     const calculatedNivel4List: CalculatedProjectTask[] = nivel4Tasks.map((task) => {
       const elements = taskElementsMap.get(task.uniqueId) || [];
       const rule = taskRuleMap.get(task.uniqueId);
 
-      let realPhysicalProgress = 0;
-      let metrosPresupuestados = 0;
-      let metrosEjecutados = 0;
-      let camarasTerminadas = 0;
-      let camarasEnProceso = 0;
-      let camarasNoIniciadas = 0;
+      const progressResult = this.calculateLevel4PhysicalProgress(task, elements, rule);
 
-      if (task.isMilestone) {
-        // Hitos: mantener el % reportado o 100% si está aprobado
-        realPhysicalProgress = task.percentComplete;
-      } else if (elements.length > 0) {
-        const isPipeline = rule?.tipoElemento === 'tuberia' || elements.some((e) => e.elementType === 'tuberia');
+      globalMetrosEjecutados += progressResult.metrosEjecutados;
+      globalMetrosPresupuestados += progressResult.metrosPresupuestados;
 
-        if (isPipeline) {
-          // Fórmula ponderada por longitud de canalización:
-          // Σ(metros ejecutados) / Σ(metros presupuestados) * 100
-          elements.forEach((p) => {
-            const presup = getConduitPresupuestadoMeters(p);
-            const ejec = getConduitEjecutadoMeters(p);
-            metrosPresupuestados += presup;
-            metrosEjecutados += ejec;
-          });
-
-          globalMetrosEjecutados += metrosEjecutados;
-          globalMetrosPresupuestados += metrosPresupuestados;
-
-          if (metrosPresupuestados > 0) {
-            realPhysicalProgress = Math.min(100, Math.round((metrosEjecutados / metrosPresupuestados) * 1000) / 10);
-          } else {
-            // Si no tiene metraje presupuestado explícito, promedio simple de estados
-            const sumPct = elements.reduce((acc, p) => acc + getPhotoProgressPercentage(p), 0);
-            realPhysicalProgress = Math.round((sumPct / elements.length) * 10) / 10;
-          }
-        } else {
-          // Fórmula para cámaras / cajas: unidades físicas y avance de montaje
-          // Σ(% avance) / N
-          let sumProgress = 0;
-          elements.forEach((p) => {
-            const pct = getPhotoProgressPercentage(p);
-            sumProgress += pct;
-            if (pct >= 100) camarasTerminadas++;
-            else if (pct > 0) camarasEnProceso++;
-            else camarasNoIniciadas++;
-          });
-          realPhysicalProgress = Math.round((sumProgress / elements.length) * 10) / 10;
-        }
-      } else {
-        realPhysicalProgress = 0;
-      }
-
-      const variance = Math.round((realPhysicalProgress - task.percentComplete) * 10) / 10;
+      const variance = Math.round((progressResult.realPhysicalProgress - task.percentComplete) * 10) / 10;
       let status: 'ADELANTADO' | 'AL_DIA' | 'ATRASADO' = 'AL_DIA';
       if (variance > 2) status = 'ADELANTADO';
       else if (variance < -2) status = 'ATRASADO';
@@ -773,14 +895,14 @@ export class ProjectScheduleService {
         ...task,
         matchedElementsCount: elements.length,
         matchedElements: elements,
-        realPhysicalProgress,
+        realPhysicalProgress: progressResult.realPhysicalProgress,
         variance,
         status,
-        metrosPresupuestadosTotal: metrosPresupuestados,
-        metrosEjecutadosTotal: metrosEjecutados,
-        camarasTerminadasCount: camarasTerminadas,
-        camarasEnProcesoCount: camarasEnProceso,
-        camarasNoIniciadasCount: camarasNoIniciadas,
+        metrosPresupuestadosTotal: progressResult.metrosPresupuestados,
+        metrosEjecutadosTotal: progressResult.metrosEjecutados,
+        camarasTerminadasCount: progressResult.camarasTerminadas,
+        camarasEnProcesoCount: progressResult.camarasEnProceso,
+        camarasNoIniciadasCount: progressResult.camarasNoIniciadas,
         ruleApplied: rule,
       };
     });
