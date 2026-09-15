@@ -2078,7 +2078,7 @@ export const MapView: React.FC<MapViewProps> = ({
                 event.dataTransfer.dropEffect = 'move';
               }}
               onDrop={handleCanvasDrop}
-              className={`relative inline-flex h-full w-full md:max-h-[calc(100vh-15rem)] md:max-w-[calc(100vw-3rem)] overflow-hidden border-0 md:border md:border-[#9dbbc9] bg-[#e7edf1] md:bg-white shadow-none md:shadow-[0_18px_46px_rgba(7,63,116,0.22)] transition-transform duration-100 select-none ${
+              className={`relative inline-flex shrink-0 max-h-[100dvh] max-w-[100vw] md:max-h-[calc(100vh-15rem)] md:max-w-[calc(100vw-3rem)] overflow-hidden border-0 md:border md:border-[#9dbbc9] bg-white shadow-none md:shadow-[0_18px_46px_rgba(7,63,116,0.22)] transition-transform duration-100 select-none ${
                 placement || creationMode ? 'cursor-crosshair' : dragTarget ? 'ring-2 ring-[#18a9cf] ring-offset-2' : 'cursor-default'
               }`}
               style={{ transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${planScale})` }}
@@ -2087,7 +2087,7 @@ export const MapView: React.FC<MapViewProps> = ({
               <img
                 src={blueprint.imageUrl}
                 alt={blueprint.name}
-                className="block h-full w-full md:max-h-[calc(100vh-15rem)] md:max-w-[calc(100vw-3rem)] object-contain select-none pointer-events-none"
+                className="block max-h-[100dvh] max-w-[100vw] md:max-h-[calc(100vh-15rem)] md:max-w-[calc(100vw-3rem)] object-contain select-none pointer-events-none"
                 draggable={false}
               />
 
@@ -3882,6 +3882,68 @@ export const MapView: React.FC<MapViewProps> = ({
                 <span className="material-symbols-outlined text-[16px]">{arePipeNamesVisible ? 'visibility' : 'visibility_off'}</span>
                 Tramos
               </button>
+            </div>
+          </div>
+
+          {/* Tamaño de Elementos y Textos */}
+          <div>
+            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500">
+              Tamaño de Marcadores y Textos
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="material-symbols-outlined text-[17px] text-[#b77812]">ads_click</span>
+                  <span className="text-xs font-bold text-slate-700 truncate">Iconos ({Math.round(iconScale * 100)}%)</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => adjustIconScale(-0.1)}
+                    disabled={iconScale <= 0.2}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-30"
+                    aria-label="Reducir tamaño iconos"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">remove</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => adjustIconScale(0.1)}
+                    disabled={iconScale >= 1.8}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-30"
+                    aria-label="Aumentar tamaño iconos"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">add</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="material-symbols-outlined text-[17px] text-[#0b5d8c]">text_fields</span>
+                  <span className="text-xs font-bold text-slate-700 truncate">Textos ({Math.round(textScale * 100)}%)</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => adjustTextScale(-0.1)}
+                    disabled={textScale <= 0.25}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-30"
+                    aria-label="Reducir tamaño textos"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">remove</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => adjustTextScale(0.1)}
+                    disabled={textScale >= 1.8}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-30"
+                    aria-label="Aumentar tamaño textos"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">add</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
