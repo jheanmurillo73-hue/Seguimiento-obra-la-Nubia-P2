@@ -50,8 +50,8 @@ export const ProjectCurvaSView: React.FC<ProjectCurvaSViewProps> = ({
 
   // Metadatos y registros semanales
   const metaData = useMemo(() => {
-    return ProjectCurvaSService.getCurvaSMetaData(selectedCutoffIso);
-  }, [selectedCutoffIso]);
+    return ProjectCurvaSService.getCurvaSMetaData(selectedCutoffIso, tasks);
+  }, [selectedCutoffIso, tasks]);
 
   // Actividades en pronóstico (Lookahead)
   const lookaheadList = useMemo(() => {
@@ -81,9 +81,10 @@ export const ProjectCurvaSView: React.FC<ProjectCurvaSViewProps> = ({
           if (onUpdateTasks) {
             onUpdateTasks(parsed.tasks);
           }
+          const realPct = parsed.detectedGlobalPercent ?? ProjectCurvaSService.calculateGlobalProgressFromTasks(parsed.tasks);
           setUploadFeedback({
             type: 'success',
-            message: `¡Cronograma importado con éxito! Se cargaron ${parsed.tasks.length} actividades desde "${parsed.projectName}" (con y sin avance).`,
+            message: `¡Cronograma XML cargado con éxito! Se importaron ${parsed.tasks.length} actividades desde "${parsed.projectName}". Avance real global actualizado a ${realPct}% (leído desde PercentComplete / PhysicalPercentComplete).`,
           });
         } else {
           setUploadFeedback({

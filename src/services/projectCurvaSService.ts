@@ -70,18 +70,71 @@ export const OFFICIAL_CURVA_S_SERIES: Array<{
 
 export class ProjectCurvaSService {
   /**
+   * Calcula el avance físico global real a partir de las tareas cargadas de Project
+   */
+  static calculateGlobalProgressFromTasks(tasks: ProjectTask[]): number {
+    if (!tasks || tasks.length === 0) return 26;
+
+    // 1. Buscar si existe la tarea resumen del proyecto (ID 0 o que contenga cronograma general)
+    const rootTask = tasks.find(
+      (t) => t.uniqueId === 0 || t.id === 'proj-0' || t.name.toLowerCase().includes('cronograma obra')
+    );
+    if (rootTask && typeof rootTask.percentComplete === 'number' && rootTask.percentComplete > 0) {
+      return rootTask.percentComplete;
+    }
+
+    // 2. Buscar nivel 1 (por ejemplo OBRAS CIVILES o capítulos mayores)
+    const level1Tasks = tasks.filter((t) => t.outlineLevel === 1 && t.durationDays > 0);
+    if (level1Tasks.length > 0) {
+      const totalDays = level1Tasks.reduce((acc, t) => acc + (t.durationDays || 1), 0);
+      const weightedProgress = level1Tasks.reduce((acc, t) => acc + (t.durationDays || 1) * (t.percentComplete || 0), 0);
+      if (totalDays > 0) {
+        return Math.round(weightedProgress / totalDays);
+      }
+    }
+
+    // 3. Promedio ponderado de tareas hoja (Nivel 3 y 4 ejecutables)
+    const leafTasks = tasks.filter((t) => (t.outlineLevel === 3 || t.outlineLevel === 4) && t.durationDays > 0);
+    if (leafTasks.length > 0) {
+      const totalDays = leafTasks.reduce((acc, t) => acc + (t.durationDays || 1), 0);
+      const weightedProgress = leafTasks.reduce((acc, t) => acc + (t.durationDays || 1) * (t.percentComplete || 0), 0);
+      if (totalDays > 0) {
+        return Math.round(weightedProgress / totalDays);
+      }
+    }
+
+    return 26; // Valor base contractual
+  }
+
+  /**
    * Genera los registros de la Curva S con corte semanal los viernes
    */
-  static getWeeklyCutoffs(customCutoffDateIso?: string): WeeklyCutoffRecord[] {
+  static getWeeklyCutoffs(customCutoffDateIso?: string, currentTasks?: ProjectTask[]): WeeklyCutoffRecord[] {
     const cutoffDate = customCutoffDateIso || '2026-09-18';
     let prevPlanned = 0;
+
+    // Avance real calculado desde las tareas del XML si están disponibles
+    const realGlobalPct = currentTasks && currentTasks.length > 0
+      ? this.calculateGlobalProgressFromTasks(currentTasks)
+      : null;
 
     return OFFICIAL_CURVA_S_SERIES.map((entry, idx) => {
       const increment = idx === 0 ? entry.planned : Math.max(0, entry.planned - prevPlanned);
       prevPlanned = entry.planned;
 
       const isPassed = entry.dateIso <= cutoffDate;
-      const actualVal = isPassed ? (entry.actual !== null ? entry.actual : null) : null;
+      const isCurrentCutoff = entry.dateIso === cutoffDate;
+
+      // Si es la fecha de corte actual y tenemos tareas del XML, usar el avance extraído de las tareas
+      let actualVal: number | null = null;
+      if (isPassed) {
+        if (isCurrentCutoff && realGlobalPct !== null) {
+          actualVal = realGlobalPct;
+        } else {
+          actualVal = entry.actual !== null ? entry.actual : null;
+        }
+      }
+
       const variance = actualVal !== null ? Number((actualVal - entry.planned).toFixed(1)) : null;
 
       let status: 'ATRASADO' | 'AL_DIA' | 'ADELANTADO' | 'FUTURO' = 'FUTURO';
@@ -107,8 +160,8 @@ export class ProjectCurvaSService {
   /**
    * Resumen global de la Curva S a la fecha de corte actual
    */
-  static getCurvaSMetaData(customCutoffDateIso?: string): ProjectScheduleMetaData {
-    const weeklyCutoffs = this.getWeeklyCutoffs(customCutoffDateIso);
+  static getCurvaSMetaData(customCutoffDateIso?: string, currentTasks?: ProjectTask[]): ProjectScheduleMetaData {
+    const weeklyCutoffs = this.getWeeklyCutoffs(customCutoffDateIso, currentTasks);
     const cutoffIso = customCutoffDateIso || '2026-09-18';
     
     // Buscar el registro de la fecha de corte actual
@@ -213,6 +266,7 @@ export class ProjectCurvaSService {
     projectName: string;
     startDate: string;
     finishDate: string;
+    detectedGlobalPercent?: number;
   } {
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(xmlString, 'text/xml');
@@ -235,13 +289,19 @@ export class ProjectCurvaSService {
 
     // Pila para calcular parentId según OutlineLevel
     const hierarchyStack: { [level: number]: number } = {};
+    let detectedGlobalPercent: number | undefined = undefined;
 
     taskElements.forEach((taskElem, index) => {
+      // Omitir tareas nulas (tareas eliminadas que Project conserva con IsNull = 1)
+      const isNull = taskElem.querySelector('IsNull')?.textContent === '1';
+      if (isNull) return;
+
       const uidStr = taskElem.querySelector('UID')?.textContent || `${index + 1}`;
       const uid = parseInt(uidStr, 10) || index + 1;
       const name = taskElem.querySelector('Name')?.textContent?.trim() || `Tarea ${uid}`;
       const outlineLevelStr = taskElem.querySelector('OutlineLevel')?.textContent || '4';
-      const outlineLevel = Math.min(5, Math.max(1, parseInt(outlineLevelStr, 10))) as 1 | 2 | 3 | 4 | 5;
+      const parsedLevel = parseInt(outlineLevelStr, 10);
+      const outlineLevel = (parsedLevel === 0 ? 1 : Math.min(5, Math.max(1, parsedLevel))) as 1 | 2 | 3 | 4 | 5;
 
       const durationStr = taskElem.querySelector('Duration')?.textContent || 'PT0H0M0S';
       // Convertir duración de formato ISO PT80H0M0S a días laborables (8 horas = 1 día)
@@ -258,8 +318,39 @@ export class ProjectCurvaSService {
 
       const start = taskElem.querySelector('Start')?.textContent?.slice(0, 10) || '';
       const finish = taskElem.querySelector('Finish')?.textContent?.slice(0, 10) || '';
-      const percentStr = taskElem.querySelector('PercentComplete')?.textContent || '0';
-      const percentComplete = Math.min(100, Math.max(0, parseInt(percentStr, 10)));
+
+      // Extracción robusta de avance:
+      // En Microsoft Project el avance puede venir en:
+      // 1. <PercentComplete> (% Completado de duración)
+      // 2. <PhysicalPercentComplete> (% Físico Completado - usado frecuentemente en interventoría de obras)
+      // 3. <PercentWorkComplete> (% Completado de trabajo)
+      const pctVal = taskElem.querySelector('PercentComplete')?.textContent;
+      const physPctVal = taskElem.querySelector('PhysicalPercentComplete')?.textContent;
+      const workPctVal = taskElem.querySelector('PercentWorkComplete')?.textContent;
+
+      const parsePct = (val?: string | null): number => {
+        if (!val) return 0;
+        const clean = val.trim().replace('%', '').replace(',', '.');
+        const num = parseFloat(clean);
+        if (isNaN(num)) return 0;
+        // Si viene como fracción decimal entre 0 y 1 (ej: 0.26 en lugar de 26)
+        if (num > 0 && num <= 1) return Math.round(num * 100);
+        return Math.min(100, Math.max(0, Math.round(num)));
+      };
+
+      const percentComplete = Math.max(
+        parsePct(pctVal),
+        parsePct(physPctVal),
+        parsePct(workPctVal)
+      );
+
+      // Si es la tarea resumen del proyecto (OutlineLevel 0 o UID 0)
+      if (parsedLevel === 0 || uid === 0 || name.toLowerCase().includes('cronograma obra')) {
+        if (percentComplete > 0) {
+          detectedGlobalPercent = percentComplete;
+        }
+      }
+
       const isMilestone = taskElem.querySelector('Milestone')?.textContent === '1' || durationDays === 0;
 
       // Calcular jerarquía parentId
@@ -309,6 +400,7 @@ export class ProjectCurvaSService {
       projectName,
       startDate,
       finishDate,
+      detectedGlobalPercent,
     };
   }
 
