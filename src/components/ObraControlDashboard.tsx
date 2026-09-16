@@ -26,6 +26,7 @@ interface ObraControlDashboardProps {
 
 export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
   photos,
+  inspector,
   onSelectPhoto,
   onNavigateToMap,
   onNavigateToUpload,
@@ -681,6 +682,8 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
           resumenRedesActas={resumenRedesActas}
           onNavigateToMap={() => onNavigateToMap()}
           onOpenSupabaseModal={onOpenSupabaseModal}
+          photos={photos}
+          inspector={inspector}
         />
       )}
 

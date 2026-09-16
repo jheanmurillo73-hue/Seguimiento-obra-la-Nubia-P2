@@ -13,6 +13,7 @@ import { getCameraSelectionLabel } from '../lib/cameraSelectionLabel';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from './ui/breadcrumb';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog';
 import { BulkEditModal } from './BulkEditModal';
+import { ActaPdfReportModal } from './ActaPdfReportModal';
 import { BottomSheet } from './BottomSheet';
 import { getActaTheme } from '../services/obraAnalyticsService';
 
@@ -460,6 +461,8 @@ export const MapView: React.FC<MapViewProps> = ({
   // Modo de coloreado del plano: 'redes' (MT/BT/Datos estándar) o 'actas' (Codificación por Acta y Facturación)
   const [mapColorMode, setMapColorMode] = useState<'redes' | 'actas'>('redes');
   const [selectedActasFilter, setSelectedActasFilter] = useState<string[]>([]);
+  const [isActaPdfModalOpen, setIsActaPdfModalOpen] = useState<boolean>(false);
+  const [actaPdfInitialFilter, setActaPdfInitialFilter] = useState<string | undefined>(undefined);
 
   const isPhotoMatchingActaFilter = useCallback((photo: InspectionPhoto, filters: string[]) => {
     if (!filters || filters.length === 0) return true;
@@ -2071,6 +2074,19 @@ export const MapView: React.FC<MapViewProps> = ({
         </button>
         <button
           type="button"
+          onClick={() => {
+            const firstActa = selectedActasFilter.length === 1 ? selectedActasFilter[0] : undefined;
+            setActaPdfInitialFilter(firstActa);
+            setIsActaPdfModalOpen(true);
+          }}
+          className="inline-flex h-8 items-center gap-1.5 rounded-full border border-red-200 bg-red-50/80 px-3 text-[11px] font-bold text-red-700 shadow-xs transition hover:bg-red-100 hover:border-red-300 active:scale-95"
+          title="Generar informe técnico en PDF por Actas (Dossier con plano general, foto de elemento y flecha localizadora)"
+        >
+          <span className="material-symbols-outlined text-[15px] text-red-600">picture_as_pdf</span>
+          Informe PDF
+        </button>
+        <button
+          type="button"
           onClick={() => setAreCameraNamesVisible((visible) => !visible)}
           className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold shadow-sm transition ${
             areCameraNamesVisible
@@ -2939,6 +2955,23 @@ export const MapView: React.FC<MapViewProps> = ({
                       <span className="w-2.5 h-0.5 border-b border-dashed border-slate-400"></span> Punteado: Pendiente
                     </span>
                   </div>
+
+                  {/* Botón de Exportación a PDF desde el modal de Actas */}
+                  <div className="mt-2 pt-1 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const firstActa = selectedActasFilter.length === 1 ? selectedActasFilter[0] : undefined;
+                        setActaPdfInitialFilter(firstActa);
+                        setIsActaPdfModalOpen(true);
+                      }}
+                      className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold transition shadow-xs"
+                      title="Generar informe técnico en PDF estructurado por actas con fotos y flechas señalizadoras"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">picture_as_pdf</span>
+                      <span>Generar Dossier PDF {selectedActasFilter.length === 1 ? `(${selectedActasFilter[0]})` : ''}</span>
+                    </button>
+                  </div>
                 </div>
               )
             )}
@@ -3700,6 +3733,14 @@ export const MapView: React.FC<MapViewProps> = ({
         }}
       />
 
+      <ActaPdfReportModal
+        isOpen={isActaPdfModalOpen}
+        onClose={() => setIsActaPdfModalOpen(false)}
+        photos={photos}
+        inspector={inspector}
+        initialActaFilter={actaPdfInitialFilter}
+      />
+
       {/* Controles flotantes móviles de zoom y navegación (< 768px) */}
       <div className="fixed bottom-6 left-3 z-30 md:hidden flex flex-col gap-2">
         <div className="flex flex-col rounded-xl bg-white/95 border border-[#9dbbc9]/90 shadow-xl overflow-hidden backdrop-blur-md">
@@ -4185,6 +4226,19 @@ export const MapView: React.FC<MapViewProps> = ({
 
           {/* Acciones adicionales */}
           <div className="pt-2 border-t border-slate-100 flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setIsMobileToolsOpen(false);
+                const firstActa = selectedActasFilter.length === 1 ? selectedActasFilter[0] : undefined;
+                setActaPdfInitialFilter(firstActa);
+                setIsActaPdfModalOpen(true);
+              }}
+              className="flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 p-2.5 text-xs font-bold text-red-700 hover:bg-red-100"
+            >
+              <span className="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+              Informe PDF por Actas
+            </button>
             <button
               type="button"
               onClick={() => {

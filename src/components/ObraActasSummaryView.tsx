@@ -1,18 +1,26 @@
 import React, { useState } from 'react';
 import { ResumenRedesActaRow, getActaTheme } from '../services/obraAnalyticsService';
+import { InspectionPhoto, InspectorProfile } from '../types';
+import { ActaPdfReportModal } from './ActaPdfReportModal';
 
 interface ObraActasSummaryViewProps {
   resumenRedesActas: ResumenRedesActaRow[];
   onNavigateToMap: () => void;
   onOpenSupabaseModal?: () => void;
+  photos?: InspectionPhoto[];
+  inspector?: InspectorProfile;
 }
 
 export const ObraActasSummaryView: React.FC<ObraActasSummaryViewProps> = ({
   resumenRedesActas,
   onNavigateToMap,
   onOpenSupabaseModal,
+  photos = [],
+  inspector,
 }) => {
   const [actaFilter, setActaFilter] = useState<string>('TODAS');
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState<boolean>(false);
+  const [pdfModalInitialActa, setPdfModalInitialActa] = useState<string | undefined>(undefined);
 
   const actasList = Array.from(new Set(resumenRedesActas.map((r) => r.actaNumero))).sort();
 
@@ -68,6 +76,18 @@ export const ObraActasSummaryView: React.FC<ObraActasSummaryViewProps> = ({
             >
               <span className="material-symbols-outlined text-[16px]">palette</span>
               Ver Codificación en Plano
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPdfModalInitialActa(actaFilter !== 'TODAS' ? actaFilter : undefined);
+                setIsPdfModalOpen(true);
+              }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition shadow-xs"
+              title="Generar informe técnico en PDF por acta (plano por acta con foto y flecha por elemento)"
+            >
+              <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>
+              Informe PDF Actas
             </button>
           </div>
         </div>
@@ -336,6 +356,15 @@ export const ObraActasSummaryView: React.FC<ObraActasSummaryViewProps> = ({
           </table>
         </div>
       </div>
+
+      {/* Modal de Generación de Informe en PDF por Actas (Enfoque B - Dossier con fotos y flechas) */}
+      <ActaPdfReportModal
+        isOpen={isPdfModalOpen}
+        onClose={() => setIsPdfModalOpen(false)}
+        photos={photos}
+        inspector={inspector}
+        initialActaFilter={pdfModalInitialActa}
+      />
     </div>
   );
 };

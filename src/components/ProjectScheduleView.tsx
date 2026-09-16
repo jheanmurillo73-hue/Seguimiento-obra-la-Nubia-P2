@@ -17,6 +17,7 @@ import {
   resolvePhotoNetworkType,
 } from '../services/projectScheduleService';
 import { isSupabaseConfigured } from '../lib/supabase';
+import { ProjectCurvaSView } from './ProjectCurvaSView';
 
 interface ProjectScheduleViewProps {
   photos: InspectionPhoto[];
@@ -33,8 +34,14 @@ export const ProjectScheduleView: React.FC<ProjectScheduleViewProps> = ({
   const [tasks, setTasks] = useState<ProjectTask[]>(() => ProjectScheduleService.getTasks());
   const [rules, setRules] = useState<ProjectMappingRule[]>(() => ProjectScheduleService.getRules());
 
-  // Navegación interna de pestañas
-  const [activeTab, setActiveTab] = useState<'JERARQUIA' | 'MAPEO' | 'PENDIENTES' | 'CONFLICTOS' | 'AUDITORIA'>('JERARQUIA');
+  // Navegación interna de pestañas (Curva S con corte los viernes predeterminada)
+  const [activeTab, setActiveTab] = useState<'CURVA_S' | 'JERARQUIA' | 'MAPEO' | 'PENDIENTES' | 'CONFLICTOS' | 'AUDITORIA'>('CURVA_S');
+
+  // Actualización y persistencia de tareas desde el cargador de cronogramas
+  const handleUpdateTasks = (newTasks: ProjectTask[]) => {
+    setTasks(newTasks);
+    ProjectScheduleService.saveTasks(newTasks);
+  };
 
   // Filtros de búsqueda en la vista
   const [searchQuery, setSearchQuery] = useState('');
@@ -483,6 +490,22 @@ export const ProjectScheduleView: React.FC<ProjectScheduleViewProps> = ({
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
         <button
           type="button"
+          onClick={() => setActiveTab('CURVA_S')}
+          className={`px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer ${
+            activeTab === 'CURVA_S'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200'
+          }`}
+        >
+          <span className="material-symbols-outlined text-[17px]">trending_up</span>
+          <span>Curva S & Pronóstico Project</span>
+          <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-400 text-amber-950 font-black">
+            Viernes
+          </span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveTab('JERARQUIA')}
           className={`px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer ${
             activeTab === 'JERARQUIA'
@@ -546,6 +569,16 @@ export const ProjectScheduleView: React.FC<ProjectScheduleViewProps> = ({
           <span>Trazabilidad</span>
         </button>
       </div>
+
+      {/* PESTAÑA 0: CURVA S CON CORTE SEMANAL LOS VIERNES Y PRONÓSTICO LOOKAHEAD */}
+      {activeTab === 'CURVA_S' && (
+        <ProjectCurvaSView
+          photos={photos}
+          tasks={tasks}
+          onUpdateTasks={handleUpdateTasks}
+          onNavigateToMapWithPhoto={onNavigateToMapWithPhoto}
+        />
+      )}
 
       {/* PESTAÑA 1: ESTRUCTURA JERÁRQUICA Y AVANCES (NIVEL 1 A 4) */}
       {activeTab === 'JERARQUIA' && (
