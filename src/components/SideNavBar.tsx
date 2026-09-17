@@ -57,11 +57,6 @@ export const SideNavBar: React.FC<SideNavBarProps> = ({
       icon: 'add_a_photo',
     },
     {
-      id: 'history',
-      label: 'Historial',
-      icon: 'history',
-    },
-    {
       id: 'activity',
       label: 'Actividad de Campo',
       icon: 'receipt_long',

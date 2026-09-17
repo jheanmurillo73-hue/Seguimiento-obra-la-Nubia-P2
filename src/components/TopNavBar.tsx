@@ -40,14 +40,6 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
   const [showNotifications, setShowNotifications] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
 
-  const isGalleryActive = currentTab === 'dashboard' || currentTab === 'detail';
-  const isMapActive = currentTab === 'map';
-  const isDatabaseActive = currentTab === 'database';
-  const isScheduleActive = currentTab === 'schedule';
-  const isHistoryActive = currentTab === 'history' || currentTab === 'collections';
-  const isUploadActive = currentTab === 'upload';
-  const isActivityActive = currentTab === 'activity';
-  const canUseModule = (module: AppModule) => isAdmin || allowedModules.includes(module);
   const connectionPresentation = {
     checking: {
       label: 'Verificando conexión',
@@ -68,15 +60,6 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
       badgeClass: 'border-red-200 bg-red-50 text-[#9b1c1c]',
     },
   }[connectionState];
-  const desktopNavItems: Array<{ id: AppModule; label: string; icon?: string; isActive: boolean }> = [
-    { id: 'dashboard', label: 'Galería', isActive: isGalleryActive },
-    { id: 'map', label: 'Plano', icon: 'map', isActive: isMapActive },
-    { id: 'database', label: 'Base de Datos', icon: 'database', isActive: isDatabaseActive },
-    { id: 'schedule', label: 'Cronograma', icon: 'account_tree', isActive: isScheduleActive },
-    { id: 'history', label: 'Historial', isActive: isHistoryActive },
-    { id: 'upload', label: 'Subir', isActive: isUploadActive },
-    { id: 'activity', label: 'Actividad', isActive: isActivityActive },
-  ];
 
   return (
     <>
@@ -90,25 +73,6 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
           >
             <span className="truncate">TRACKING LA NUBIA</span>
           </button>
-
-          {/* Desktop Nav links */}
-          <nav className="hidden md:flex items-center space-x-6 ml-6">
-            {desktopNavItems.filter((item) => canUseModule(item.id)).map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => onTabChange(item.id)}
-                className={`pb-1 font-['Inter'] text-[14px] font-bold tracking-[0.02em] transition-all relative flex items-center gap-1.5 ${
-                  item.isActive
-                    ? 'text-[#004d99] border-b-2 border-[#004d99]'
-                    : 'text-[#424752] hover:text-[#004d99]'
-                }`}
-              >
-                {item.icon && <span className="material-symbols-outlined text-[16px]">{item.icon}</span>}
-                <span>{item.label}</span>
-              </button>
-            ))}
-          </nav>
         </div>
 
         {/* Right Action Icons & Avatar */}
@@ -124,12 +88,6 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
             <span className="hidden sm:inline">{connectionPresentation.label}</span>
             <span className="sm:hidden">{connectionState === 'connected' ? 'En línea' : connectionState === 'disconnected' ? 'Sin red' : '…'}</span>
           </button>
-
-          {/* Local Device Storage Active Badge */}
-          <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold" title="Tus fotos y datos se guardan en la memoria de tu PC o celular">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>Memoria Local</span>
-          </div>
 
           {/* Notifications Dropdown */}
           <div className="relative shrink-0">
