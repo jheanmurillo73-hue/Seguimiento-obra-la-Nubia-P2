@@ -1,9 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { InspectionPhoto, InspectorProfile } from '../types';
+import { InspectionPhoto, InspectorProfile, ActaItem } from '../types';
 import {
   generateActaDossierPdf,
   groupPhotosByActa,
+  MemoryNamingMode,
 } from '../services/pdfReportService';
+import { ACTA_ITEM_OPTIONS, getActaItemKey } from '../data/actaItems';
 
 interface ActaPdfReportModalProps {
   isOpen: boolean;
@@ -22,6 +24,8 @@ export const ActaPdfReportModal: React.FC<ActaPdfReportModalProps> = ({
 }) => {
   const [selectedActa, setSelectedActa] = useState<string>(initialActaFilter || 'TODAS');
   const [elementsPerPage, setElementsPerPage] = useState<1 | 2>(2);
+  const [memoryNamingMode, setMemoryNamingMode] = useState<MemoryNamingMode>('item_and_element');
+  const [selectedItemCode, setSelectedItemCode] = useState<string>('AUTO');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [progressPercent, setProgressPercent] = useState<number>(0);
   const [progressMessage, setProgressMessage] = useState<string>('');
@@ -58,11 +62,18 @@ export const ActaPdfReportModal: React.FC<ActaPdfReportModalProps> = ({
       setProgressPercent(5);
       setProgressMessage('Iniciando generador de dossier técnico...');
 
+      const chosenItem = selectedItemCode !== 'AUTO'
+        ? ACTA_ITEM_OPTIONS.find((i) => i.code === selectedItemCode) || null
+        : null;
+
       const blob = await generateActaDossierPdf(photos, {
         selectedActas: selectedActa === 'TODAS' ? [] : [selectedActa],
         elementsPerPage,
         inspector,
         projectName: 'Inspección de Redes Eléctricas y Obra',
+        memoryNamingMode,
+        defaultActaItem: chosenItem,
+        overrideAllWithActaItem: chosenItem,
         onProgress: (percent, msg) => {
           setProgressPercent(percent);
           setProgressMessage(msg);
@@ -263,7 +274,121 @@ export const ActaPdfReportModal: React.FC<ActaPdfReportModalProps> = ({
               </div>
             </div>
 
-            {/* 3. Tarjeta de Contenido que se Generará */}
+            {/* 3. Nomenclatura de la Memoria Técnica de acuerdo al Ítem del Acta */}
+            <div className="bg-amber-50/50 border border-amber-200/80 rounded-xl p-3.5 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-amber-900 uppercase tracking-wide flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[17px] text-amber-700">label_important</span>
+                  Nombre de la Memoria según Ítem del Acta:
+                </label>
+                <span className="text-[10px] bg-amber-200/70 text-amber-900 font-semibold px-2 py-0.5 rounded-full">
+                  Contractual
+                </span>
+              </div>
+
+              {/* Formato de Nomenclatura */}
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-semibold text-slate-700 block">
+                  Estilo de título en la cabecera de cada ficha:
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setMemoryNamingMode('item_and_element')}
+                    className={`p-2 rounded-lg text-left text-xs border transition ${
+                      memoryNamingMode === 'item_and_element'
+                        ? 'bg-white border-[#004d99] text-[#004d99] shadow-2xs font-bold'
+                        : 'bg-white/70 border-slate-200 text-slate-700 hover:bg-white'
+                    }`}
+                  >
+                    <div className="font-semibold text-[11px]">Ítem + Descripción (Elemento)</div>
+                    <div className="text-[10px] text-slate-500 truncate">
+                      Ej: ÍTEM 6.3 - SEI TUBERIA PVC 4'' (TRAMO T19_I1)
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setMemoryNamingMode('item_code_element')}
+                    className={`p-2 rounded-lg text-left text-xs border transition ${
+                      memoryNamingMode === 'item_code_element'
+                        ? 'bg-white border-[#004d99] text-[#004d99] shadow-2xs font-bold'
+                        : 'bg-white/70 border-slate-200 text-slate-700 hover:bg-white'
+                    }`}
+                  >
+                    <div className="font-semibold text-[11px]">Ítem Contractual • Elemento</div>
+                    <div className="text-[10px] text-slate-500 truncate">
+                      Ej: ÍTEM 6.3 • TRAMO T19_I1
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setMemoryNamingMode('element_and_item')}
+                    className={`p-2 rounded-lg text-left text-xs border transition ${
+                      memoryNamingMode === 'element_and_item'
+                        ? 'bg-white border-[#004d99] text-[#004d99] shadow-2xs font-bold'
+                        : 'bg-white/70 border-slate-200 text-slate-700 hover:bg-white'
+                    }`}
+                  >
+                    <div className="font-semibold text-[11px]">Elemento [Ítem Contractual]</div>
+                    <div className="text-[10px] text-slate-500 truncate">
+                      Ej: TRAMO T19_I1 [ÍTEM 6.3]
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setMemoryNamingMode('item_description')}
+                    className={`p-2 rounded-lg text-left text-xs border transition ${
+                      memoryNamingMode === 'item_description'
+                        ? 'bg-white border-[#004d99] text-[#004d99] shadow-2xs font-bold'
+                        : 'bg-white/70 border-slate-200 text-slate-700 hover:bg-white'
+                    }`}
+                  >
+                    <div className="font-semibold text-[11px]">Solo Ítem y Descripción</div>
+                    <div className="text-[10px] text-slate-500 truncate">
+                      Ej: MEMORIA TÉCNICA: ÍTEM 6.3 - SEI TUBERIA PVC 4''
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Selector de Ítem del Acta */}
+              <div className="space-y-1 pt-1 border-t border-amber-200/60">
+                <label className="text-[11px] font-semibold text-slate-700 flex items-center justify-between">
+                  <span>Asignación de Ítem Contractual:</span>
+                  <span className="text-[10px] text-slate-500 font-normal">
+                    {selectedItemCode === 'AUTO' ? 'Inferencia técnica activa' : `Fijado en ítem ${selectedItemCode}`}
+                  </span>
+                </label>
+                <select
+                  value={selectedItemCode}
+                  onChange={(e) => setSelectedItemCode(e.target.value)}
+                  className="w-full text-xs font-medium border border-slate-300 rounded-lg p-2 bg-white text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-[#004d99]"
+                >
+                  <option value="AUTO">
+                    ⚡ Automático: según ítem asignado o características técnicas (ej: PVC 4'', Cajas 0.9x0.9)
+                  </option>
+                  <optgroup label="Canalizaciones Principales y Tuberías">
+                    {ACTA_ITEM_OPTIONS.filter((item) => item.code.startsWith('6.') || item.code.startsWith('1.')).map((item) => (
+                      <option key={getActaItemKey(item)} value={item.code}>
+                        Ítem {item.code} ({item.unit}) - {item.description.slice(0, 65)}...
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Redes de Media Tensión (MT) y Baja Tensión (BT)">
+                    {ACTA_ITEM_OPTIONS.filter((item) => !item.code.startsWith('6.') && !item.code.startsWith('1.')).map((item) => (
+                      <option key={getActaItemKey(item)} value={item.code}>
+                        Ítem {item.code} ({item.unit}) - {item.description.slice(0, 65)}...
+                      </option>
+                    ))}
+                  </optgroup>
+                </select>
+              </div>
+            </div>
+
+            {/* 4. Tarjeta de Contenido que se Generará */}
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2 text-xs">
               <div className="font-bold text-slate-700 flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-[16px] text-[#004d99]">info</span>

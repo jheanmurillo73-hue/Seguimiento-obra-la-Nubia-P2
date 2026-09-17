@@ -573,7 +573,7 @@ export const ACTA_ITEM_OPTIONS: ReadonlyArray<ActaItem> = [
     "section": "OBRA MEDIA TENSION Y SUBESTACIONES"
   },
   {
-    "code": "4.1",
+    "code": "4.10",
     "description": "SEI TUBERIA PVC 4'' - INCLUYE EXCAVACION Y RELLENO CON MATERIAL DE SITIO",
     "unit": "ML",
     "quantity": "1554",
@@ -643,7 +643,7 @@ export const ACTA_ITEM_OPTIONS: ReadonlyArray<ActaItem> = [
     "section": "OBRA MEDIA TENSION Y SUBESTACIONES"
   },
   {
-    "code": "4.2",
+    "code": "4.20",
     "description": "INSTALACION TRANSFORMADOR PADMOUNTED DE 225 KVA 3F 13200 / 220/127V CON ACCESORIOS. INCLUYE CONSTRUCCION DE TRAMPA DE ACEITE.",
     "unit": "UN",
     "quantity": "1",

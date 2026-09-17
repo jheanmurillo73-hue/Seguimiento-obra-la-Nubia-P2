@@ -13,6 +13,7 @@ import {
   InspectionPhoto,
   InspectorProfile,
   PipeConduit,
+  ActaItem,
   getElementType,
   getElementSector,
   getPhotoProgressPercentage,
@@ -26,6 +27,7 @@ import {
 } from '../types';
 import { getActaTheme, ActaColorTheme } from './obraAnalyticsService';
 import { loadBlueprintImage, loadEvidenceImages } from './blueprintStorageService';
+import { ACTA_ITEM_OPTIONS } from '../data/actaItems';
 
 export interface FormattedConduit {
   networkType: string;
@@ -187,6 +189,13 @@ export function getCajaTypeDescription(photo: InspectionPhoto): string {
   return typeName;
 }
 
+export type MemoryNamingMode =
+  | 'item_and_element' // "FICHA / MEMORIA TÉCNICA #1: ÍTEM 6.3 - SEI TUBERIA PVC 4'' (TRAMO T19_I1)"
+  | 'item_code_element' // "FICHA / MEMORIA TÉCNICA #1: ÍTEM 6.3 • TRAMO T19_I1"
+  | 'item_description' // "MEMORIA TÉCNICA: ÍTEM 6.3 - SEI TUBERIA PVC 4''"
+  | 'element_and_item' // "FICHA / MEMORIA TÉCNICA #1: TRAMO T19_I1 [ÍTEM 6.3]"
+  | 'element_only'; // "FICHA / MEMORIA TÉCNICA #1: TRAMO T19_I1"
+
 export interface PdfReportOptions {
   selectedActas?: string[]; // Si está vacío o contiene 'TODAS', incluye todas las actas
   includePhotos?: boolean;
@@ -194,7 +203,131 @@ export interface PdfReportOptions {
   projectName?: string;
   inspector?: InspectorProfile;
   elementsPerPage?: 1 | 2; // 2 por página es el estándar técnico balanceado
+  memoryNamingMode?: MemoryNamingMode; // Nomenclatura de la memoria técnica de acuerdo al ítem del acta
+  defaultActaItem?: ActaItem | null; // Ítem contractual por defecto si el elemento no tiene asignado
+  overrideAllWithActaItem?: ActaItem | null; // Forzar un ítem específico para toda el acta
   onProgress?: (percent: number, message: string) => void;
+}
+
+/**
+ * Resuelve el ítem del acta correspondiente al elemento / foto técnica.
+ * Prioridad:
+ * 1. Override forzado si el usuario seleccionó un ítem fijo en las opciones del reporte
+ * 2. photo.actaItem o photo.actaItems[0] si ya estaba asignado en la base de datos
+ * 3. Fallback predeterminado seleccionado por el usuario en el modal
+ * 4. Inferencia técnica según red, tipo de tubería/caja y dimensiones
+ */
+export function resolvePhotoActaItem(
+  photo: InspectionPhoto,
+  fallbackItem?: ActaItem | null,
+  overrideItem?: ActaItem | null,
+): ActaItem {
+  if (overrideItem && overrideItem.code) {
+    return overrideItem;
+  }
+
+  if (photo.actaItem && photo.actaItem.code) {
+    return photo.actaItem;
+  }
+
+  if (Array.isArray(photo.actaItems) && photo.actaItems.length > 0 && photo.actaItems[0]?.code) {
+    return photo.actaItems[0];
+  }
+
+  if (fallbackItem && fallbackItem.code) {
+    return fallbackItem;
+  }
+
+  const isPipe = getElementType(photo) === 'tuberia' || Boolean(photo.tramo) || (Array.isArray(photo.pipeConduits) && photo.pipeConduits.length > 0);
+  const netInfo = getPhotoNetworkInfo(photo);
+
+  if (isPipe) {
+    // Si tiene tubería PVC 4" (canalizaciones principales o datos)
+    const has4Inch = photo.pipeConduits?.some(c => String(c.configuration || '').includes('4')) ?? true;
+    if (netInfo.primary === 'DATOS' || has4Inch) {
+      const match = ACTA_ITEM_OPTIONS.find(i => i.code === '6.3'); // "SEI TUBERIA PVC 4'' - INCLUYE EXCAVACION Y RELLENO CON MATERIAL DE SITIO"
+      if (match) return match;
+    }
+    if (netInfo.primary === 'MT') {
+      const match = ACTA_ITEM_OPTIONS.find(i => i.code === '1.1'); // "SEI ACOMETIDA 3#1/0 XLPE 100% ALUMINIO EN CINTA +1#2 BD"
+      if (match) return match;
+    }
+    if (netInfo.primary === 'BT') {
+      const match = ACTA_ITEM_OPTIONS.find(i => i.code === '2.1'); // "SEI ACOMETIDA 3#250 +1#250 + 1#2 THHN..."
+      if (match) return match;
+    }
+    const generalPipe = ACTA_ITEM_OPTIONS.find(i => i.code === '6.3');
+    if (generalPipe) return generalPipe;
+  } else {
+    // Es caja o cámara de inspección
+    const camCode = (photo.cameraCode || photo.name || '').toUpperCase();
+    if (camCode.includes('858') || camCode.includes('C') || camCode.includes('CAJA')) {
+      const match = ACTA_ITEM_OPTIONS.find(i => i.code === '6.1'); // "SUMINISTRO CAJA CON MARCO Y TAPA PARA CAJA SUBTERRANEA DE PASO TIPO A SB858 CELSIA 0,9X0,9X1"
+      if (match) return match;
+    }
+    if (netInfo.primary === 'MT') {
+      const match = ACTA_ITEM_OPTIONS.find(i => i.code === '6.1');
+      if (match) return match;
+    }
+    const generalBox = ACTA_ITEM_OPTIONS.find(i => i.code === '6.1');
+    if (generalBox) return generalBox;
+  }
+
+  return ACTA_ITEM_OPTIONS.find(i => i.code === '6.3') || ACTA_ITEM_OPTIONS[0] || {
+    code: '1.0',
+    description: 'CANALIZACIONES Y REDES DE OBRA',
+    unit: 'ML',
+    quantity: '1',
+    section: 'OBRAS CIVILES',
+  };
+}
+
+/**
+ * Genera el título de la Memoria Técnica de acuerdo al Ítem del Acta
+ */
+export function getMemoryTitle(
+  photo: InspectionPhoto,
+  globalIndex: number,
+  mode: MemoryNamingMode = 'item_and_element',
+  defaultItem?: ActaItem | null,
+  overrideItem?: ActaItem | null,
+): { title: string; item: ActaItem; shortItemDesc: string } {
+  const item = resolvePhotoActaItem(photo, defaultItem, overrideItem);
+  const isPipe = getElementType(photo) === 'tuberia' || Boolean(photo.tramo) || (Array.isArray(photo.pipeConduits) && photo.pipeConduits.length > 0);
+  const elementName = isPipe ? `TRAMO ${photo.name}` : photo.name;
+
+  // Extraer una descripción concisa del ítem para que sea legible en el título (máx 32 caracteres)
+  let shortItemDesc = item.description.split('-')[0].trim();
+  if (shortItemDesc.length > 32) {
+    shortItemDesc = shortItemDesc.slice(0, 30) + '...';
+  }
+
+  let title = '';
+  switch (mode) {
+    case 'item_and_element':
+      // "FICHA / MEMORIA TÉCNICA #1: ÍTEM 6.3 - SEI TUBERIA PVC 4'' (TRAMO T19_I1)"
+      title = `FICHA / MEMORIA TÉCNICA #${globalIndex}: ÍTEM ${item.code} - ${shortItemDesc} (${elementName})`;
+      break;
+    case 'item_code_element':
+      // "FICHA / MEMORIA TÉCNICA #1: ÍTEM 6.3 • TRAMO T19_I1"
+      title = `FICHA / MEMORIA TÉCNICA #${globalIndex}: ÍTEM ${item.code} • ${elementName}`;
+      break;
+    case 'item_description':
+      // "MEMORIA TÉCNICA: ÍTEM 6.3 - SEI TUBERIA PVC 4''"
+      title = `MEMORIA TÉCNICA #${globalIndex}: ÍTEM ${item.code} - ${shortItemDesc}`;
+      break;
+    case 'element_and_item':
+      // "FICHA / MEMORIA TÉCNICA #1: TRAMO T19_I1 [ÍTEM 6.3]"
+      title = `FICHA / MEMORIA TÉCNICA #${globalIndex}: ${elementName} [ÍTEM ${item.code}]`;
+      break;
+    case 'element_only':
+    default:
+      // "FICHA / MEMORIA TÉCNICA #1: TRAMO T19_I1"
+      title = `FICHA / MEMORIA TÉCNICA #${globalIndex}: ${elementName}`;
+      break;
+  }
+
+  return { title, item, shortItemDesc };
 }
 
 export interface ActaGroup {
@@ -796,6 +929,9 @@ export async function generateActaDossierPdf(
     selectedActas = [],
     projectName = 'Inspección y Control de Obra Eléctrica & Redes',
     inspector: _inspector,
+    memoryNamingMode = 'item_and_element',
+    defaultActaItem = null,
+    overrideAllWithActaItem = null,
     onProgress,
   } = options;
 
@@ -959,8 +1095,8 @@ export async function generateActaDossierPdf(
       doc.setFontSize(6.7);
       doc.setTextColor(51, 65, 85);
       doc.text('#', margin + 1.5, headerY + 3.8);
-      doc.text('Tramo / Elemento', margin + 7.5, headerY + 3.8);
-      doc.text('Detalle Tuberías (Tipo, Dimensión 4"/6", Metraje Ejecutado = Total Ducto, Presup.) / Caja', margin + 32, headerY + 3.8);
+      doc.text('Tramo / Elemento & Ítem', margin + 7.5, headerY + 3.8);
+      doc.text('Detalle Tuberías (Tipo, Dimensión 4"/6", Metraje Ejecutado = Total Ducto, Presup.) / Caja', margin + 35, headerY + 3.8);
       doc.text('Sector', margin + 133, headerY + 3.8);
       doc.text('Acta', margin + 151, headerY + 3.8);
       doc.text('Avance Físico', margin + 168, headerY + 3.8);
@@ -981,7 +1117,7 @@ export async function generateActaDossierPdf(
 
       // Calcular altura dinámica del renglón según número de tuberías
       const detailLinesCount = isPipe ? Math.max(1, conduits.length) : 1;
-      const rowHeight = Math.max(6, 2.6 + detailLinesCount * 3.4);
+      const rowHeight = Math.max(7, 2.8 + detailLinesCount * 3.4);
 
       // Si sobrepasa la página, añadir página de continuación de índice
       if (yPos + rowHeight > pageHeight - 16) {
@@ -1016,13 +1152,19 @@ export async function generateActaDossierPdf(
       doc.setTextColor(37, 99, 235);
       doc.text(`[${pIdx + 1}]`, margin + 1.5, yPos + 3.8);
 
-      // Columna 2: Nombre de Tramo o Caja
+      // Columna 2: Nombre de Tramo o Caja e Ítem Contractual del Acta
+      const tableItem = resolvePhotoActaItem(photo, defaultActaItem, overrideAllWithActaItem);
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(6.8);
+      doc.setFontSize(6.5);
       doc.setTextColor(15, 23, 42);
       const nameText = isPipe ? `Tramo: ${photo.name}` : photo.name;
-      const splitName = doc.splitTextToSize(nameText, 23);
-      doc.text(splitName.slice(0, 2), margin + 7.5, yPos + 3.8);
+      const splitName = doc.splitTextToSize(nameText, 25);
+      doc.text(splitName[0], margin + 7.5, yPos + 3.3);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(5.8);
+      doc.setTextColor(180, 83, 9);
+      doc.text(`Ít. ${tableItem.code}`, margin + 7.5, yPos + 6.6);
 
       // Columna 3: Detalle de Tuberías (tipo, dimensión, metros ejecutados = total ducto) o Caja
       if (isPipe) {
@@ -1102,9 +1244,17 @@ export async function generateActaDossierPdf(
         const globalIndex = i + slot + 1;
         const isPipe = getElementType(photo) === 'tuberia' || Boolean(photo.tramo) || (Array.isArray(photo.pipeConduits) && photo.pipeConduits.length > 0);
 
+        const { title: elTitle, item: resolvedItem, shortItemDesc } = getMemoryTitle(
+          photo,
+          globalIndex,
+          memoryNamingMode,
+          defaultActaItem,
+          overrideAllWithActaItem,
+        );
+
         onProgress?.(
           actaProgressStart + Math.round(((i + slot) / photosToProcess.length) * 15),
-          `Procesando Memoria #${globalIndex}: ${isPipe ? `Tramo ${photo.name}` : photo.name} (Croquis con Flecha)...`,
+          `Procesando Memoria #${globalIndex}: Ítem ${resolvedItem.code} - ${isPipe ? `Tramo ${photo.name}` : photo.name}...`,
         );
 
         // Marco exterior de la Ficha
@@ -1118,10 +1268,17 @@ export async function generateActaDossierPdf(
         doc.roundedRect(margin, cardTopY, contentWidth, 8, 2, 2, 'F');
         doc.rect(margin, cardTopY + 4, contentWidth, 4, 'F'); // Aplanar parte inferior
 
+        // Ajuste dinámico del tamaño de fuente del título de la memoria para evitar solapamiento
+        const maxTitleW = contentWidth - 75;
+        let titleFontSize = 8.5;
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8.8);
+        doc.setFontSize(titleFontSize);
+        while (doc.getTextWidth(elTitle) > maxTitleW && titleFontSize > 6.6) {
+          titleFontSize -= 0.3;
+          doc.setFontSize(titleFontSize);
+        }
+
         doc.setTextColor(7, 63, 116);
-        const elTitle = isPipe ? `FICHA / MEMORIA TÉCNICA #${globalIndex}: TRAMO ${photo.name}` : `FICHA / MEMORIA TÉCNICA #${globalIndex}: ${photo.name}`;
         doc.text(elTitle, margin + 3, cardTopY + 5.5);
 
         // Badges en la cabecera de la ficha (Acta y % de Avance)
@@ -1186,15 +1343,23 @@ export async function generateActaDossierPdf(
           doc.setFont('helvetica', 'bold');
           doc.setFontSize(7.5);
           doc.setTextColor(7, 63, 116);
-          doc.text(`Nombre de tramo: ${photo.name}`, margin + 5, metaTopY + 4.2);
+          doc.text(`Nombre de tramo: ${photo.name}`, margin + 5, metaTopY + 4.0);
 
           doc.setFont('helvetica', 'normal');
           doc.setFontSize(7);
           doc.setTextColor(51, 65, 85);
-          doc.text(`Sector: ${sectorLabel}   |   Acta: ${actaLabel}   |   Avance Físico: ${progVal}% (${photo.executionStatus || 'En proceso'})`, margin + 48, metaTopY + 4.2);
+          doc.text(`Sector: ${sectorLabel}   |   Acta: ${actaLabel}   |   Avance Físico: ${progVal}% (${photo.executionStatus || 'En proceso'})`, margin + 48, metaTopY + 4.0);
 
-          // Línea 2: Encabezado de Desglose
-          let curY = metaTopY + 7.8;
+          // Línea 2: Ítem contractual del Acta
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(6.8);
+          doc.setTextColor(180, 83, 9);
+          const itemFullText = `Ítem contractual del Acta: Ítem ${resolvedItem.code} (${resolvedItem.unit}) - ${resolvedItem.description}`;
+          const splitItemText = doc.splitTextToSize(itemFullText, contentWidth - 12);
+          doc.text(splitItemText[0], margin + 5, metaTopY + 7.4);
+
+          // Línea 3: Encabezado de Desglose
+          let curY = metaTopY + 10.7;
           doc.setFont('helvetica', 'bold');
           doc.setFontSize(6.8);
           doc.setTextColor(15, 23, 42);
@@ -1227,9 +1392,9 @@ export async function generateActaDossierPdf(
           doc.text(`Resumen Tramo: Longitud física: ${distEjec.toFixed(1)} m de ${distPresup.toFixed(1)} m presup.  |  Metros lineales ductos acumulados: ${linearEjec.toFixed(1)} m`, margin + 5, curY);
 
           // Observaciones
-          curY += 3.4;
+          curY += 3.3;
           doc.setFont('helvetica', 'normal');
-          doc.setFontSize(6.3);
+          doc.setFontSize(6.2);
           doc.setTextColor(100, 116, 139);
           const descText = photo.fieldNotes || photo.location || 'Sin observaciones adicionales registradas en campo.';
           const splitDesc = doc.splitTextToSize(`Observaciones: ${descText}`, contentWidth - 12);
@@ -1243,22 +1408,30 @@ export async function generateActaDossierPdf(
           doc.setFont('helvetica', 'bold');
           doc.setFontSize(7.5);
           doc.setTextColor(7, 63, 116);
-          doc.text(`Elemento: ${photo.name}`, margin + 5, metaTopY + 4.5);
+          doc.text(`Elemento: ${photo.name}`, margin + 5, metaTopY + 4.2);
 
           doc.setTextColor(15, 23, 42);
-          doc.text(`Tipo de Caja: ${cajaDesc}`, margin + 38, metaTopY + 4.5);
+          doc.text(`Tipo de Caja: ${cajaDesc}`, margin + 38, metaTopY + 4.2);
 
           doc.setTextColor(7, 63, 116);
-          doc.text(`Acta / Memoria: ${actaLabel}`, pageWidth - margin - 50, metaTopY + 4.5);
+          doc.text(`Acta / Memoria: ${actaLabel}`, pageWidth - margin - 50, metaTopY + 4.2);
 
-          // Línea 2: Red, Sector, Avance y Medición
-          let curY = metaTopY + 9;
+          // Línea 2: Ítem contractual del Acta
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(6.8);
+          doc.setTextColor(180, 83, 9);
+          const itemBoxText = `Ítem contractual del Acta: Ítem ${resolvedItem.code} (${resolvedItem.unit}) - ${resolvedItem.description}`;
+          const splitItemBox = doc.splitTextToSize(itemBoxText, contentWidth - 12);
+          doc.text(splitItemBox[0], margin + 5, metaTopY + 7.8);
+
+          // Línea 3: Red, Sector, Avance y Medición
+          let curY = metaTopY + 11.5;
           doc.setFont('helvetica', 'bold');
           doc.setFontSize(6.8);
           doc.setTextColor(51, 65, 85);
           doc.text(`Red: ${netInfo.label}   |   Sector: ${sectorLabel}   |   Avance Físico: ${progVal}% (${photo.executionStatus || 'Terminado'})   |   Medición: Puntual (1 unidad instalada)`, margin + 5, curY);
 
-          // Línea 3: Coordenadas e ID
+          // Línea 4: Coordenadas e ID
           curY += 3.8;
           doc.setFont('helvetica', 'normal');
           doc.setFontSize(6.5);
@@ -1266,10 +1439,10 @@ export async function generateActaDossierPdf(
           const coordsText = `X: ${photo.planX?.toFixed(1) ?? '0'}% | Y: ${photo.planY?.toFixed(1) ?? '0'}%`;
           doc.text(`Coordenadas relativas en plano: ${coordsText}   |   ID Registro: ${photo.displayId || photo.id}`, margin + 5, curY);
 
-          // Línea 4: Observaciones
+          // Línea 5: Observaciones
           curY += 3.6;
           doc.setFont('helvetica', 'normal');
-          doc.setFontSize(6.3);
+          doc.setFontSize(6.2);
           doc.setTextColor(100, 116, 139);
           const descText = photo.fieldNotes || photo.location || 'Sin observaciones adicionales registradas en campo.';
           const splitDesc = doc.splitTextToSize(`Observaciones: ${descText}`, contentWidth - 12);
