@@ -198,6 +198,7 @@ export type MemoryNamingMode =
 
 export interface PdfReportOptions {
   selectedActas?: string[]; // Si está vacío o contiene 'TODAS', incluye todas las actas
+  selectedItemCode?: string; // Código de ítem contractual para segmentar (ej: '3.65', o 'TODOS' para completo)
   includePhotos?: boolean;
   includeMiniMapArrows?: boolean;
   projectName?: string;
@@ -207,6 +208,115 @@ export interface PdfReportOptions {
   defaultActaItem?: ActaItem | null; // Ítem contractual por defecto si el elemento no tiene asignado
   overrideAllWithActaItem?: ActaItem | null; // Forzar un ítem específico para toda el acta
   onProgress?: (percent: number, message: string) => void;
+}
+
+/**
+ * Obtiene todos los ítems contractuales a los que aplica o corresponde un elemento / foto.
+ */
+export function getPhotoMatchedItems(
+  photo: InspectionPhoto,
+  fallbackItem?: ActaItem | null,
+): ActaItem[] {
+  const items: ActaItem[] = [];
+  const seen = new Set<string>();
+
+  const addItem = (it?: ActaItem | null) => {
+    if (!it || !it.code) return;
+    const key = it.code.trim();
+    if (!seen.has(key)) {
+      seen.add(key);
+      items.push(it);
+    }
+  };
+
+  // 1. Items explícitos de la foto
+  if (photo.actaItem) addItem(photo.actaItem);
+  if (Array.isArray(photo.actaItems)) {
+    photo.actaItems.forEach(addItem);
+  }
+
+  // 2. Inferencia según tuberías y dimensiones
+  const isPipe = getElementType(photo) === 'tuberia' || Boolean(photo.tramo) || (Array.isArray(photo.pipeConduits) && photo.pipeConduits.length > 0);
+  if (isPipe) {
+    const has6 = photo.pipeConduits?.some(c => String(c.configuration || '').includes('6'))
+      || String(photo.tramo || '').includes('6');
+    if (has6) {
+      const item6 = ACTA_ITEM_OPTIONS.find(i => i.code === '3.65');
+      if (item6) addItem(item6);
+    }
+
+    const has4 = photo.pipeConduits?.some(c => String(c.configuration || '').includes('4'))
+      || String(photo.tramo || '').includes('4')
+      || (!has6);
+    if (has4) {
+      const item4 = ACTA_ITEM_OPTIONS.find(i => i.code === '6.3');
+      if (item4) addItem(item4);
+    }
+
+    const netInfo = getPhotoNetworkInfo(photo);
+    if (netInfo.primary === 'MT') {
+      const itemMt = ACTA_ITEM_OPTIONS.find(i => i.code === '1.1');
+      if (itemMt) addItem(itemMt);
+    }
+    if (netInfo.primary === 'BT') {
+      const itemBt = ACTA_ITEM_OPTIONS.find(i => i.code === '2.1');
+      if (itemBt) addItem(itemBt);
+    }
+  } else {
+    // Es cámara o caja
+    const camCode = (photo.cameraCode || photo.name || '').toUpperCase();
+    if (camCode.includes('858') || camCode.includes('C') || camCode.includes('CAJA')) {
+      const itemBox = ACTA_ITEM_OPTIONS.find(i => i.code === '6.1');
+      if (itemBox) addItem(itemBox);
+    } else {
+      const itemBox = ACTA_ITEM_OPTIONS.find(i => i.code === '6.1');
+      if (itemBox) addItem(itemBox);
+    }
+  }
+
+  // 3. Fallback o resolved
+  const resolved = resolvePhotoActaItem(photo, fallbackItem);
+  addItem(resolved);
+
+  return items;
+}
+
+/**
+ * Comprueba si una foto coincide con el ítem contractual filtrado (ej: '3.65').
+ */
+export function doesPhotoMatchItem(
+  photo: InspectionPhoto,
+  targetItemCode?: string | null,
+  fallbackItem?: ActaItem | null,
+): boolean {
+  if (!targetItemCode || targetItemCode === 'TODOS' || targetItemCode === 'ALL') {
+    return true;
+  }
+  const cleanTarget = targetItemCode.trim().toLowerCase();
+
+  // Coincidencia directa con items asignados en la foto
+  if (photo.actaItem?.code?.trim().toLowerCase() === cleanTarget) return true;
+  if (photo.actaItems?.some(it => it.code?.trim().toLowerCase() === cleanTarget)) return true;
+
+  // Coincidencia en la lista calculada de ítems correspondientes
+  const matched = getPhotoMatchedItems(photo, fallbackItem);
+  if (matched.some(it => it.code.trim().toLowerCase() === cleanTarget)) return true;
+
+  // Heurística de tuberías 6" para 3.65
+  if (cleanTarget === '3.65') {
+    const is6 = photo.pipeConduits?.some(c => String(c.configuration || '').includes('6'))
+      || String(photo.tramo || '').includes('6');
+    if (is6) return true;
+  }
+
+  // Heurística de tuberías 4" para 6.3
+  if (cleanTarget === '6.3') {
+    const is4 = photo.pipeConduits?.some(c => String(c.configuration || '').includes('4'))
+      || String(photo.tramo || '').includes('4');
+    if (is4) return true;
+  }
+
+  return false;
 }
 
 /**
@@ -242,7 +352,15 @@ export function resolvePhotoActaItem(
   const netInfo = getPhotoNetworkInfo(photo);
 
   if (isPipe) {
-    // Si tiene tubería PVC 4" (canalizaciones principales o datos)
+    // Si tiene tubería PVC 6" -> Ítem 3.65 (SEI TUBERIA PVC 6'')
+    const has6Inch = photo.pipeConduits?.some(c => String(c.configuration || '').includes('6'))
+      || String(photo.tramo || '').includes('6');
+    if (has6Inch) {
+      const match6 = ACTA_ITEM_OPTIONS.find(i => i.code === '3.65');
+      if (match6) return match6;
+    }
+
+    // Si tiene tubería PVC 4" (canalizaciones principales o datos) -> Ítem 6.3
     const has4Inch = photo.pipeConduits?.some(c => String(c.configuration || '').includes('4')) ?? true;
     if (netInfo.primary === 'DATOS' || has4Inch) {
       const match = ACTA_ITEM_OPTIONS.find(i => i.code === '6.3'); // "SEI TUBERIA PVC 4'' - INCLUYE EXCAVACION Y RELLENO CON MATERIAL DE SITIO"
@@ -291,8 +409,10 @@ export function getMemoryTitle(
   mode: MemoryNamingMode = 'item_and_element',
   defaultItem?: ActaItem | null,
   overrideItem?: ActaItem | null,
+  segmentedItemCode?: string,
 ): { title: string; item: ActaItem; shortItemDesc: string } {
-  const item = resolvePhotoActaItem(photo, defaultItem, overrideItem);
+  const targetItem = (segmentedItemCode && segmentedItemCode !== 'TODOS' ? ACTA_ITEM_OPTIONS.find(i => i.code === segmentedItemCode) : null);
+  const item = targetItem || resolvePhotoActaItem(photo, defaultItem, overrideItem);
   const isPipe = getElementType(photo) === 'tuberia' || Boolean(photo.tramo) || (Array.isArray(photo.pipeConduits) && photo.pipeConduits.length > 0);
   const elementName = isPipe ? `TRAMO ${photo.name}` : photo.name;
 
@@ -419,6 +539,8 @@ function loadImageSafe(src: string): Promise<HTMLImageElement | null> {
 async function renderGeneralBlueprintCanvas(
   actaGroup: ActaGroup,
   blueprintImg: HTMLImageElement | null,
+  selectedItemCode?: string,
+  targetItemObj?: ActaItem | null,
 ): Promise<string> {
   const width = 1600;
   const height = 1100;
@@ -583,10 +705,18 @@ async function renderGeneralBlueprintCanvas(
   // Datos en el cajetín
   ctx.fillStyle = '#334155';
   ctx.font = '11px Helvetica, Arial, sans-serif';
-  ctx.fillText(`Acta: ${actaGroup.label} (${actaGroup.estado})`, boxX + 12, boxY + 52);
-  ctx.fillText(`Elementos destacados: ${actaGroup.photos.length} u.`, boxX + 12, boxY + 70);
-  ctx.fillText(`Metraje ejecutado: ${actaGroup.totalMeters.toFixed(1)} m`, boxX + 12, boxY + 88);
-  ctx.fillText(`Avance promedio: ${actaGroup.avgProgress}%`, boxX + 12, boxY + 106);
+  if (selectedItemCode && selectedItemCode !== 'TODOS') {
+    ctx.fillText(`Acta: ${actaGroup.label} • Ítem ${selectedItemCode}`, boxX + 12, boxY + 50);
+    const shortDesc = targetItemObj ? targetItemObj.description.slice(0, 32) : 'Segmento contractual';
+    ctx.fillText(`Ítem: ${shortDesc}`, boxX + 12, boxY + 68);
+    ctx.fillText(`Elementos del ítem: ${actaGroup.photos.length} u.`, boxX + 12, boxY + 86);
+    ctx.fillText(`Metraje ejecutado: ${actaGroup.totalMeters.toFixed(1)} m  (${actaGroup.avgProgress}%)`, boxX + 12, boxY + 104);
+  } else {
+    ctx.fillText(`Acta: ${actaGroup.label} (${actaGroup.estado})`, boxX + 12, boxY + 52);
+    ctx.fillText(`Elementos destacados: ${actaGroup.photos.length} u.`, boxX + 12, boxY + 70);
+    ctx.fillText(`Metraje ejecutado: ${actaGroup.totalMeters.toFixed(1)} m`, boxX + 12, boxY + 88);
+    ctx.fillText(`Avance promedio: ${actaGroup.avgProgress}%`, boxX + 12, boxY + 106);
+  }
 
   // Rosa de los vientos / Norte
   const northX = 70;
@@ -927,6 +1057,7 @@ export async function generateActaDossierPdf(
 ): Promise<Blob> {
   const {
     selectedActas = [],
+    selectedItemCode = 'TODOS',
     projectName = 'Inspección y Control de Obra Eléctrica & Redes',
     inspector: _inspector,
     memoryNamingMode = 'item_and_element',
@@ -934,6 +1065,11 @@ export async function generateActaDossierPdf(
     overrideAllWithActaItem = null,
     onProgress,
   } = options;
+
+  const isSegmented = Boolean(selectedItemCode && selectedItemCode !== 'TODOS' && selectedItemCode !== 'ALL');
+  const targetItemObj = isSegmented
+    ? (ACTA_ITEM_OPTIONS.find((i) => i.code === selectedItemCode) || null)
+    : null;
 
   onProgress?.(5, 'Iniciando recopilación de planos y elementos...');
 
@@ -961,6 +1097,46 @@ export async function generateActaDossierPdf(
     throw new Error('No se encontraron elementos correspondientes a las actas seleccionadas.');
   }
 
+  // Segmentar por Ítem contractual si se ha especificado (ej: '3.65')
+  let activeGroups: ActaGroup[] = [];
+  if (isSegmented) {
+    activeGroups = filteredGroups.map((g) => {
+      const matchedPhotos = g.photos.filter((p) => doesPhotoMatchItem(p, selectedItemCode, defaultActaItem));
+
+      let itemTotalM = 0;
+      let sumProgress = 0;
+      matchedPhotos.forEach((p) => {
+        const isPipe = getElementType(p) === 'tuberia' || Boolean(p.tramo) || (Array.isArray(p.pipeConduits) && p.pipeConduits.length > 0);
+        if (isPipe) {
+          const conduits = getPhotoConduitsBreakdown(p);
+          const matchedConduits = conduits.filter(c => {
+            if (selectedItemCode === '3.65') return c.dimension.includes('6') || c.configuration.includes('6');
+            if (selectedItemCode === '6.3') return c.dimension.includes('4') || c.configuration.includes('4');
+            return true;
+          });
+          const cMeters = matchedConduits.reduce((sum, c) => sum + (c.isEjecutado ? c.ejecMeters : 0), 0);
+          itemTotalM += cMeters > 0 ? cMeters : (getPhotoRealLinearMeters(p).ejecutadoLinearMeters || 0);
+        }
+        sumProgress += getPhotoProgressPercentage(p);
+      });
+
+      return {
+        ...g,
+        photos: matchedPhotos,
+        totalMeters: itemTotalM > 0 ? itemTotalM : g.totalMeters,
+        avgProgress: matchedPhotos.length > 0 ? Math.round(sumProgress / matchedPhotos.length) : 0,
+      };
+    }).filter((g) => g.photos.length > 0);
+
+    if (activeGroups.length === 0) {
+      throw new Error(
+        `No se encontraron elementos correspondientes al Ítem ${selectedItemCode} (${targetItemObj?.description || ''}) en las actas seleccionadas.`
+      );
+    }
+  } else {
+    activeGroups = filteredGroups;
+  }
+
   // 3. Inicializar documento PDF (A4 Vertical: 210mm x 297mm)
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -974,14 +1150,15 @@ export async function generateActaDossierPdf(
   const contentWidth = pageWidth - margin * 2;
 
   let currentPage = 1;
-  const totalActas = filteredGroups.length;
+  const totalActas = activeGroups.length;
 
   // Helper para pie de página
   const drawFooter = (actaTitle: string) => {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(100, 116, 139);
-    doc.text(`PhotoVault • ${projectName} • ${actaTitle}`, margin, pageHeight - 6);
+    const footerItemPart = isSegmented ? ` • Ítem ${selectedItemCode}` : '';
+    doc.text(`PhotoVault • ${projectName} • ${actaTitle}${footerItemPart}`, margin, pageHeight - 6);
     doc.text(`Página ${currentPage}`, pageWidth - margin, pageHeight - 6, { align: 'right' });
   };
 
@@ -991,21 +1168,28 @@ export async function generateActaDossierPdf(
     doc.rect(margin, 8, contentWidth, 10, 'F');
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
+    doc.setFontSize(isSegmented ? 8.8 : 10);
     doc.setTextColor(255, 255, 255);
-    doc.text('DOSSIER TÉCNICO DE INSPECCIÓN • PLANO & FICHAS CON FLECHAS', margin + 4, 14.5);
+    const headerTitle = isSegmented
+      ? `DOSSIER TÉCNICO • SEGMENTO ÍTEM ${selectedItemCode}: ${targetItemObj ? targetItemObj.description.slice(0, 38) : ''}`
+      : 'DOSSIER TÉCNICO DE INSPECCIÓN • PLANO & FICHAS CON FLECHAS';
+    doc.text(headerTitle, margin + 4, 14.5);
 
     // Pill de Acta a la derecha
     doc.setFillColor(255, 255, 255);
-    doc.roundedRect(pageWidth - margin - 50, 9.5, 46, 7, 2, 2, 'F');
-    doc.setFontSize(8.5);
+    const pillW = isSegmented ? 54 : 46;
+    doc.roundedRect(pageWidth - margin - pillW, 9.5, pillW, 7, 2, 2, 'F');
+    doc.setFontSize(8.0);
     doc.setTextColor(7, 63, 116);
-    doc.text(`${actaLabel} (${estado})`, pageWidth - margin - 27, 14.5, { align: 'center' });
+    const pillText = isSegmented
+      ? `${actaLabel} • Ít. ${selectedItemCode}`
+      : `${actaLabel} (${estado})`;
+    doc.text(pillText, pageWidth - margin - (pillW / 2), 14.5, { align: 'center' });
   };
 
   // 4. Iterar sobre cada Acta
-  for (let aIndex = 0; aIndex < filteredGroups.length; aIndex++) {
-    const group = filteredGroups[aIndex];
+  for (let aIndex = 0; aIndex < activeGroups.length; aIndex++) {
+    const group = activeGroups[aIndex];
     const actaProgressStart = 20 + Math.round((aIndex / totalActas) * 70);
 
     onProgress?.(actaProgressStart, `Renderizando Plano General para ${group.label}...`);
@@ -1022,29 +1206,38 @@ export async function generateActaDossierPdf(
     // Título de la Lámina
     let yPos = 24;
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(15);
+    doc.setFontSize(14.5);
     doc.setTextColor(15, 23, 42);
-    doc.text(`Lámina General de Ubicación: ${group.label}`, margin, yPos);
+    const laminaTitle = isSegmented
+      ? `Lámina de Ubicación: ${group.label} • Ítem ${selectedItemCode}`
+      : `Lámina General de Ubicación: ${group.label}`;
+    doc.text(laminaTitle, margin, yPos);
 
     yPos += 5;
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
+    doc.setFontSize(8.5);
     doc.setTextColor(71, 85, 105);
-    doc.text(
-      `Estado: ${group.estado} • Total elementos en plano: ${group.photos.length} • Metraje acumulado: ${group.totalMeters.toFixed(1)} m • Avance promedio: ${group.avgProgress}%`,
-      margin,
-      yPos,
-    );
+    const laminaSub = isSegmented
+      ? `Segmentado por Ítem Contractual ${selectedItemCode}: ${targetItemObj?.description || ''} • Total en este ítem: ${group.photos.length} elementos`
+      : `Estado: ${group.estado} • Total elementos en plano: ${group.photos.length} • Metraje acumulado: ${group.totalMeters.toFixed(1)} m • Avance promedio: ${group.avgProgress}%`;
+    doc.text(laminaSub, margin, yPos);
 
     // Métricas rápidas en 4 cajas
     yPos += 4;
     const cardW = (contentWidth - 6) / 4;
-    const cards = [
-      { label: 'Elementos', val: `${group.photos.length} u.` },
-      { label: 'Metros Tubería', val: `${group.totalMeters.toFixed(1)} m` },
-      { label: 'Avance Físico', val: `${group.avgProgress}%` },
-      { label: 'Estado Acta', val: group.estado },
-    ];
+    const cards = isSegmented
+      ? [
+          { label: `Elementos Ítem ${selectedItemCode}`, val: `${group.photos.length} u.` },
+          { label: 'Metraje Ejecutado', val: `${group.totalMeters.toFixed(1)} m` },
+          { label: 'Avance Físico', val: `${group.avgProgress}%` },
+          { label: 'Ítem Contractual', val: `${selectedItemCode} (${targetItemObj?.unit || 'ML'})` },
+        ]
+      : [
+          { label: 'Elementos', val: `${group.photos.length} u.` },
+          { label: 'Metros Tubería', val: `${group.totalMeters.toFixed(1)} m` },
+          { label: 'Avance Físico', val: `${group.avgProgress}%` },
+          { label: 'Estado Acta', val: group.estado },
+        ];
 
     cards.forEach((c, cIdx) => {
       const cx = margin + cIdx * (cardW + 2);
@@ -1066,7 +1259,7 @@ export async function generateActaDossierPdf(
 
     // Imagen del Plano General
     yPos += 14;
-    const planImgData = await renderGeneralBlueprintCanvas(group, blueprintImg);
+    const planImgData = await renderGeneralBlueprintCanvas(group, blueprintImg, selectedItemCode, targetItemObj);
     const planHeight = 96;
     if (planImgData) {
       doc.addImage(planImgData, 'JPEG', margin, yPos, contentWidth, planHeight);
@@ -1080,7 +1273,13 @@ export async function generateActaDossierPdf(
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9.5);
     doc.setTextColor(7, 63, 116);
-    doc.text(`Índice de Elementos Georreferenciados en este Plano (${group.label}):`, margin, yPos);
+    doc.text(
+      isSegmented
+        ? `Índice de Elementos Georreferenciados del Ítem ${selectedItemCode} (${group.label}):`
+        : `Índice de Elementos Georreferenciados en este Plano (${group.label}):`,
+      margin,
+      yPos,
+    );
 
     yPos += 3;
 
@@ -1250,6 +1449,7 @@ export async function generateActaDossierPdf(
           memoryNamingMode,
           defaultActaItem,
           overrideAllWithActaItem,
+          isSegmented ? selectedItemCode : undefined,
         );
 
         onProgress?.(
@@ -1368,6 +1568,11 @@ export async function generateActaDossierPdf(
           // Conduits detallados
           curY += 3.2;
           conduits.forEach((c) => {
+            const isConduitTarget = isSegmented && (
+              (selectedItemCode === '3.65' && (c.dimension.includes('6') || c.configuration.includes('6'))) ||
+              (selectedItemCode === '6.3' && (c.dimension.includes('4') || c.configuration.includes('4')))
+            );
+
             doc.setFillColor(
               c.networkTag === 'MT' ? 21 : c.networkTag === 'BT' ? 217 : 13,
               c.networkTag === 'MT' ? 101 : c.networkTag === 'BT' ? 119 : 159,
@@ -1375,10 +1580,15 @@ export async function generateActaDossierPdf(
             );
             doc.circle(margin + 7, curY - 0.9, 0.9, 'F');
 
-            doc.setFont('helvetica', 'normal');
+            doc.setFont('helvetica', isConduitTarget ? 'bold' : 'normal');
             doc.setFontSize(6.6);
-            doc.setTextColor(30, 41, 59);
-            doc.text(c.fullDescription, margin + 9.5, curY);
+            if (isConduitTarget) {
+              doc.setTextColor(180, 83, 9);
+              doc.text(`${c.fullDescription}  [CORRESPONDE A ÍTEM ${selectedItemCode}]`, margin + 9.5, curY);
+            } else {
+              doc.setTextColor(30, 41, 59);
+              doc.text(c.fullDescription, margin + 9.5, curY);
+            }
             curY += 3.3;
           });
 

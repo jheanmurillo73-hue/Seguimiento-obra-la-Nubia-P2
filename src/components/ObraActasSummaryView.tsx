@@ -9,6 +9,7 @@ interface ObraActasSummaryViewProps {
   onOpenSupabaseModal?: () => void;
   photos?: InspectionPhoto[];
   inspector?: InspectorProfile;
+  onNavigateToBalance?: () => void;
 }
 
 export const ObraActasSummaryView: React.FC<ObraActasSummaryViewProps> = ({
@@ -17,6 +18,7 @@ export const ObraActasSummaryView: React.FC<ObraActasSummaryViewProps> = ({
   onOpenSupabaseModal,
   photos = [],
   inspector,
+  onNavigateToBalance,
 }) => {
   const [actaFilter, setActaFilter] = useState<string>('TODAS');
   const [isPdfModalOpen, setIsPdfModalOpen] = useState<boolean>(false);
@@ -67,6 +69,17 @@ export const ObraActasSummaryView: React.FC<ObraActasSummaryViewProps> = ({
               >
                 <span className="material-symbols-outlined text-[16px]">database</span>
                 Ver Definición SQL
+              </button>
+            )}
+            {onNavigateToBalance && (
+              <button
+                type="button"
+                onClick={onNavigateToBalance}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-600 text-white text-xs font-bold hover:bg-amber-700 transition shadow-xs cursor-pointer"
+                title="Ver el Balance Automatizado de Presupuesto vs Ejecución Real por Ítem y Acta (Matriz de Desviaciones)"
+              >
+                <span className="material-symbols-outlined text-[16px]">tune</span>
+                Balance Ítems (Δ)
               </button>
             )}
             <button

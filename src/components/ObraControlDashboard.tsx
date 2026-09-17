@@ -13,6 +13,7 @@ import {
 } from '../services/obraAnalyticsService';
 import { ObraBaselineContrastView } from './ObraBaselineContrastView';
 import { ObraActasSummaryView } from './ObraActasSummaryView';
+import { ObraItemBalanceView } from './ObraItemBalanceView';
 import { ObraStackedBarChart, ObraDonutChart } from './ObraCharts';
 
 interface ObraControlDashboardProps {
@@ -44,7 +45,7 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
   // Estados de la tabla y navegación
   const [searchTableQuery, setSearchTableQuery] = useState<string>('');
   const [tableFilterType, setTableFilterType] = useState<'TODOS' | 'CAMARA' | 'TUBERIA'>('TODOS');
-  const [dashboardTab, setDashboardTab] = useState<'RESUMEN' | 'CONTRASTE' | 'ACTAS'>('RESUMEN');
+  const [dashboardTab, setDashboardTab] = useState<'RESUMEN' | 'CONTRASTE' | 'ACTAS' | 'BALANCE'>('RESUMEN');
 
   // Vista y filtros específicos dentro de la tarjeta de Conteo de Cámaras
   const [cameraViewTab, setCameraViewTab] = useState<'MATRIZ' | 'ALL' | 'TIPO' | 'SECTOR' | 'ACTA'>('MATRIZ');
@@ -621,11 +622,11 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
       </div>
 
       {/* 2.5 Barra de Pestañas Principales del Dashboard */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 border-b border-[#cbd5e1] pb-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 border-b border-[#cbd5e1] pb-2">
         <button
           type="button"
           onClick={() => setDashboardTab('RESUMEN')}
-          className={`min-h-[48px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all text-center ${
+          className={`min-h-[48px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all text-center cursor-pointer ${
             dashboardTab === 'RESUMEN'
               ? 'bg-[#004d99] text-white shadow-xs'
               : 'bg-white text-[#475569] border border-[#cbd5e1] hover:bg-slate-50'
@@ -638,7 +639,7 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
         <button
           type="button"
           onClick={() => setDashboardTab('CONTRASTE')}
-          className={`min-h-[48px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all text-center ${
+          className={`min-h-[48px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all text-center cursor-pointer ${
             dashboardTab === 'CONTRASTE'
               ? 'bg-[#004d99] text-white shadow-xs'
               : 'bg-white text-[#475569] border border-[#cbd5e1] hover:bg-slate-50'
@@ -654,7 +655,7 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
         <button
           type="button"
           onClick={() => setDashboardTab('ACTAS')}
-          className={`min-h-[48px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all text-center ${
+          className={`min-h-[48px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all text-center cursor-pointer ${
             dashboardTab === 'ACTAS'
               ? 'bg-[#004d99] text-white shadow-xs'
               : 'bg-white text-[#475569] border border-[#cbd5e1] hover:bg-slate-50'
@@ -664,6 +665,22 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
           <span>Consolidado Actas</span>
           <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-blue-100 text-blue-900 font-mono">
             {resumenRedesActas.length} filas
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setDashboardTab('BALANCE')}
+          className={`min-h-[48px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all text-center cursor-pointer ${
+            dashboardTab === 'BALANCE'
+              ? 'bg-[#004d99] text-white shadow-xs'
+              : 'bg-white text-[#475569] border border-[#cbd5e1] hover:bg-slate-50'
+          }`}
+        >
+          <span className="material-symbols-outlined text-[20px]">tune</span>
+          <span>Balance Ítems (Δ)</span>
+          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-900 font-bold border border-amber-200">
+            Desviaciones
           </span>
         </button>
       </div>
@@ -684,6 +701,15 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
           onOpenSupabaseModal={onOpenSupabaseModal}
           photos={photos}
           inspector={inspector}
+          onNavigateToBalance={() => setDashboardTab('BALANCE')}
+        />
+      )}
+
+      {dashboardTab === 'BALANCE' && (
+        <ObraItemBalanceView
+          photos={photos}
+          onNavigateToMap={onNavigateToMap}
+          onSelectPhoto={onSelectPhoto}
         />
       )}
 

@@ -4,6 +4,8 @@ import {
   generateActaDossierPdf,
   groupPhotosByActa,
   MemoryNamingMode,
+  getPhotoMatchedItems,
+  doesPhotoMatchItem,
 } from '../services/pdfReportService';
 import { ACTA_ITEM_OPTIONS, getActaItemKey } from '../data/actaItems';
 
@@ -13,6 +15,7 @@ interface ActaPdfReportModalProps {
   photos: InspectionPhoto[];
   inspector?: InspectorProfile;
   initialActaFilter?: string; // Si se abre desde un acta específica
+  initialItemFilter?: string; // Si se abre desde un ítem específico (ej: '3.65')
 }
 
 export const ActaPdfReportModal: React.FC<ActaPdfReportModalProps> = ({
@@ -21,11 +24,13 @@ export const ActaPdfReportModal: React.FC<ActaPdfReportModalProps> = ({
   photos,
   inspector,
   initialActaFilter,
+  initialItemFilter,
 }) => {
   const [selectedActa, setSelectedActa] = useState<string>(initialActaFilter || 'TODAS');
+  const [selectedItemSegment, setSelectedItemSegment] = useState<string>(initialItemFilter || 'TODOS');
+  const [itemSearchText, setItemSearchText] = useState<string>('');
   const [elementsPerPage, setElementsPerPage] = useState<1 | 2>(2);
   const [memoryNamingMode, setMemoryNamingMode] = useState<MemoryNamingMode>('item_and_element');
-  const [selectedItemCode, setSelectedItemCode] = useState<string>('AUTO');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [progressPercent, setProgressPercent] = useState<number>(0);
   const [progressMessage, setProgressMessage] = useState<string>('');
@@ -40,18 +45,69 @@ export const ActaPdfReportModal: React.FC<ActaPdfReportModalProps> = ({
     return actaGroups.filter((g) => g.actaKey === selectedActa);
   }, [actaGroups, selectedActa]);
 
-  const totalElements = useMemo(() => {
-    return targetGroups.reduce((sum, g) => sum + g.photos.length, 0);
+  // Ítems presentes en los elementos de las actas en alcance
+  const detectedItemsInScope = useMemo(() => {
+    const relevantPhotos = targetGroups.flatMap((g) => g.photos);
+    const map = new Map<string, { item: ActaItem; count: number }>();
+
+    relevantPhotos.forEach((p) => {
+      const matched = getPhotoMatchedItems(p);
+      matched.forEach((it) => {
+        const prev = map.get(it.code);
+        if (prev) {
+          prev.count += 1;
+        } else {
+          map.set(it.code, { item: it, count: 1 });
+        }
+      });
+    });
+
+    return Array.from(map.values()).sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      return a.item.code.localeCompare(b.item.code, undefined, { numeric: true });
+    });
   }, [targetGroups]);
+
+  // Grupos filtrados por ítem si se ha seleccionado segmentación
+  const segmentedTargetGroups = useMemo(() => {
+    if (selectedItemSegment === 'TODOS') return targetGroups;
+    return targetGroups
+      .map((g) => ({
+        ...g,
+        photos: g.photos.filter((p) => doesPhotoMatchItem(p, selectedItemSegment)),
+      }))
+      .filter((g) => g.photos.length > 0);
+  }, [targetGroups, selectedItemSegment]);
+
+  const currentItemObj = useMemo(() => {
+    if (selectedItemSegment === 'TODOS') return null;
+    return ACTA_ITEM_OPTIONS.find((i) => i.code === selectedItemSegment) || null;
+  }, [selectedItemSegment]);
+
+  // Catálogo filtrado por texto de búsqueda
+  const filteredCatalogItems = useMemo(() => {
+    if (!itemSearchText.trim()) return ACTA_ITEM_OPTIONS;
+    const q = itemSearchText.toLowerCase().trim();
+    return ACTA_ITEM_OPTIONS.filter(
+      (item) =>
+        item.code.toLowerCase().includes(q) ||
+        item.description.toLowerCase().includes(q) ||
+        item.section.toLowerCase().includes(q)
+    );
+  }, [itemSearchText]);
+
+  const totalElements = useMemo(() => {
+    return segmentedTargetGroups.reduce((sum, g) => sum + g.photos.length, 0);
+  }, [segmentedTargetGroups]);
 
   const estimatedPages = useMemo(() => {
     let pages = 0;
-    targetGroups.forEach((g) => {
+    segmentedTargetGroups.forEach((g) => {
       pages += 1; // Lámina de plano general
       pages += Math.ceil(g.photos.length / elementsPerPage); // Páginas de fichas
     });
     return pages;
-  }, [targetGroups, elementsPerPage]);
+  }, [segmentedTargetGroups, elementsPerPage]);
 
   if (!isOpen) return null;
 
@@ -62,18 +118,14 @@ export const ActaPdfReportModal: React.FC<ActaPdfReportModalProps> = ({
       setProgressPercent(5);
       setProgressMessage('Iniciando generador de dossier técnico...');
 
-      const chosenItem = selectedItemCode !== 'AUTO'
-        ? ACTA_ITEM_OPTIONS.find((i) => i.code === selectedItemCode) || null
-        : null;
-
       const blob = await generateActaDossierPdf(photos, {
         selectedActas: selectedActa === 'TODAS' ? [] : [selectedActa],
+        selectedItemCode: selectedItemSegment,
         elementsPerPage,
         inspector,
         projectName: 'Inspección de Redes Eléctricas y Obra',
         memoryNamingMode,
-        defaultActaItem: chosenItem,
-        overrideAllWithActaItem: chosenItem,
+        defaultActaItem: currentItemObj,
         onProgress: (percent, msg) => {
           setProgressPercent(percent);
           setProgressMessage(msg);
@@ -90,7 +142,8 @@ export const ActaPdfReportModal: React.FC<ActaPdfReportModalProps> = ({
         link.href = url;
         const dateStr = new Date().toISOString().slice(0, 10);
         const actaSuffix = selectedActa === 'TODAS' ? 'Todas_Actas' : selectedActa.replace(/\s+/g, '_');
-        link.download = `Informe_Dossier_${actaSuffix}_${dateStr}.pdf`;
+        const itemSuffix = selectedItemSegment === 'TODOS' ? 'Completo' : `Item_${selectedItemSegment.replace(/\./g, '_')}`;
+        link.download = `Informe_Dossier_${actaSuffix}_${itemSuffix}_${dateStr}.pdf`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -138,12 +191,12 @@ export const ActaPdfReportModal: React.FC<ActaPdfReportModalProps> = ({
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-3">
               <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-[18px] text-green-600">check_circle</span>
-                Vista Previa del Documento Generado
+                Vista Previa del Documento Generado {selectedItemSegment !== 'TODOS' ? `(Ítem ${selectedItemSegment})` : ''}
               </span>
               <div className="flex items-center gap-2">
                 <a
                   href={previewPdfUrl}
-                  download={`Informe_Dossier_${selectedActa}_${new Date().toISOString().slice(0, 10)}.pdf`}
+                  download={`Informe_Dossier_${selectedActa}_${selectedItemSegment !== 'TODOS' ? `Item_${selectedItemSegment.replace(/\./g, '_')}` : 'Completo'}_${new Date().toISOString().slice(0, 10)}.pdf`}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#004d99] hover:bg-[#003d7a] text-white text-xs font-bold rounded-lg transition"
                 >
                   <span className="material-symbols-outlined text-[16px]">download</span>
@@ -170,7 +223,7 @@ export const ActaPdfReportModal: React.FC<ActaPdfReportModalProps> = ({
             {/* 1. Selector de Actas */}
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">
-                Seleccionar Acta a Exportar:
+                1. Seleccionar Acta a Exportar:
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <button
@@ -213,10 +266,181 @@ export const ActaPdfReportModal: React.FC<ActaPdfReportModalProps> = ({
               </div>
             </div>
 
-            {/* 2. Distribución de Fichas Técnicas */}
+            {/* 2. SEGMENTACIÓN POR ÍTEM DEL ACTA (FUNCIONALIDAD CLAVE) */}
+            <div className="bg-indigo-50/50 border border-indigo-200/80 rounded-xl p-3.5 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-indigo-950 uppercase tracking-wide flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[18px] text-indigo-600">segment</span>
+                  2. Segmentar Informe por Ítem del Acta:
+                </label>
+                <span className="text-[10px] bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded-full">
+                  Filtro Específico
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-600">
+                Puedes generar el PDF exclusivamente para un ítem contractual específico (por ejemplo,{' '}
+                <strong className="text-indigo-900">solo ítem 3.65</strong> de tubería PVC 6'', o{' '}
+                <strong className="text-indigo-900">ítem 6.3</strong> de tubería PVC 4'') o generar el informe completo sin segmentar.
+              </p>
+
+              {/* Botones Rápidos (Chips) de Ítems Detectados */}
+              <div className="space-y-1.5">
+                <span className="text-[10.5px] font-semibold text-slate-700 block">
+                  Acceso rápido según elementos del acta:
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {/* Opción Todos los Ítems */}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedItemSegment('TODOS')}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                      selectedItemSegment === 'TODOS'
+                        ? 'bg-[#004d99] text-white shadow-xs'
+                        : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[15px]">select_all</span>
+                    <span>Todos los Ítems</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${selectedItemSegment === 'TODOS' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                      {targetGroups.reduce((acc, g) => acc + g.photos.length, 0)}
+                    </span>
+                  </button>
+
+                  {/* Chips de los ítems detectados en las fotos */}
+                  {detectedItemsInScope.map(({ item, count }) => {
+                    const isSelected = selectedItemSegment === item.code;
+                    const is365 = item.code === '3.65';
+                    const is63 = item.code === '6.3';
+                    const is61 = item.code === '6.1';
+
+                    let badgeLabel = `Ítem ${item.code}`;
+                    if (is365) badgeLabel = `Ítem 3.65 (PVC 6'')`;
+                    else if (is63) badgeLabel = `Ítem 6.3 (PVC 4'')`;
+                    else if (is61) badgeLabel = `Ítem 6.1 (Cajas)`;
+
+                    return (
+                      <button
+                        key={getActaItemKey(item)}
+                        type="button"
+                        onClick={() => setSelectedItemSegment(item.code)}
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                          isSelected
+                            ? 'bg-indigo-600 text-white shadow-xs ring-2 ring-indigo-300'
+                            : 'bg-white text-slate-700 border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/40'
+                        }`}
+                        title={`${item.code}: ${item.description}`}
+                      >
+                        <span className="material-symbols-outlined text-[14px]">
+                          {is365 || is63 ? 'timeline' : 'category'}
+                        </span>
+                        <span>{badgeLabel}</span>
+                        <span
+                          className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                            isSelected ? 'bg-white/20 text-white' : 'bg-indigo-50 text-indigo-700'
+                          }`}
+                        >
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Selector Desplegable y Buscador Completo de Ítems */}
+              <div className="space-y-1 pt-1 border-t border-indigo-100">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-semibold text-slate-700">
+                    O seleccionar cualquier ítem del catálogo:
+                  </label>
+                  {selectedItemSegment !== 'TODOS' && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedItemSegment('TODOS')}
+                      className="text-[10.5px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline"
+                    >
+                      Quitar filtro (Ver todos)
+                    </button>
+                  )}
+                </div>
+
+                {/* Campo de búsqueda rápida */}
+                <div className="relative">
+                  <span className="absolute left-2.5 top-2 text-slate-400 material-symbols-outlined text-[16px]">
+                    search
+                  </span>
+                  <input
+                    type="text"
+                    value={itemSearchText}
+                    onChange={(e) => setItemSearchText(e.target.value)}
+                    placeholder="Buscar por código (ej: 3.65) o texto (ej: PVC 6, caja, acometida)..."
+                    className="w-full text-xs font-medium border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 bg-white text-slate-800 placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                  />
+                  {itemSearchText && (
+                    <button
+                      type="button"
+                      onClick={() => setItemSearchText('')}
+                      className="absolute right-2 top-2 text-slate-400 hover:text-slate-600 text-xs"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                {/* Selector Dropdown */}
+                <select
+                  value={selectedItemSegment}
+                  onChange={(e) => setSelectedItemSegment(e.target.value)}
+                  className="w-full text-xs font-medium border border-slate-300 rounded-lg p-2 bg-white text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                >
+                  <option value="TODOS">
+                    📋 Todos los Ítems (Informe Completo con todos los elementos)
+                  </option>
+                  {filteredCatalogItems.map((item) => (
+                    <option key={getActaItemKey(item)} value={item.code}>
+                      Ítem {item.code} ({item.unit}) - {item.description}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Banner informativo del ítem actualmente seleccionado */}
+              {selectedItemSegment !== 'TODOS' && currentItemObj && (
+                <div className="p-2.5 rounded-lg bg-indigo-100/70 border border-indigo-200 text-indigo-950 text-xs flex items-start gap-2">
+                  <span className="material-symbols-outlined text-[18px] text-indigo-700 shrink-0 mt-0.5">
+                    task_alt
+                  </span>
+                  <div className="space-y-0.5">
+                    <div className="font-bold flex items-center gap-2">
+                      <span>Segmentando Informe para Ítem {currentItemObj.code}</span>
+                      <span className="text-[10px] bg-indigo-600 text-white px-1.5 py-0.2 rounded font-mono">
+                        {currentItemObj.unit}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-indigo-900 leading-tight">
+                      {currentItemObj.description}
+                    </div>
+                    <div className="text-[10.5px] text-indigo-800 font-semibold pt-0.5">
+                      ✓ Se procesarán únicamente los {totalElements} elementos que corresponden a este ítem en el plano y fichas.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {selectedItemSegment !== 'TODOS' && totalElements === 0 && (
+                <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[18px] text-amber-600 shrink-0">warning</span>
+                  <span>
+                    No hay elementos que coincidan con el Ítem {selectedItemSegment} en el acta seleccionada. Prueba seleccionando "Todas las Actas" o elige otro ítem.
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* 3. Distribución de Fichas Técnicas */}
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">
-                Distribución en Páginas de Fichas:
+                3. Distribución en Páginas de Fichas:
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
@@ -274,140 +498,113 @@ export const ActaPdfReportModal: React.FC<ActaPdfReportModalProps> = ({
               </div>
             </div>
 
-            {/* 3. Nomenclatura de la Memoria Técnica de acuerdo al Ítem del Acta */}
+            {/* 4. Nomenclatura de la Memoria Técnica de acuerdo al Ítem del Acta */}
             <div className="bg-amber-50/50 border border-amber-200/80 rounded-xl p-3.5 space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-amber-900 uppercase tracking-wide flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-[17px] text-amber-700">label_important</span>
-                  Nombre de la Memoria según Ítem del Acta:
+                  4. Formato de Título de la Ficha / Memoria:
                 </label>
                 <span className="text-[10px] bg-amber-200/70 text-amber-900 font-semibold px-2 py-0.5 rounded-full">
-                  Contractual
+                  Rotulación
                 </span>
               </div>
 
               {/* Formato de Nomenclatura */}
-              <div className="space-y-1.5">
-                <span className="text-[11px] font-semibold text-slate-700 block">
-                  Estilo de título en la cabecera de cada ficha:
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setMemoryNamingMode('item_and_element')}
-                    className={`p-2 rounded-lg text-left text-xs border transition ${
-                      memoryNamingMode === 'item_and_element'
-                        ? 'bg-white border-[#004d99] text-[#004d99] shadow-2xs font-bold'
-                        : 'bg-white/70 border-slate-200 text-slate-700 hover:bg-white'
-                    }`}
-                  >
-                    <div className="font-semibold text-[11px]">Ítem + Descripción (Elemento)</div>
-                    <div className="text-[10px] text-slate-500 truncate">
-                      Ej: ÍTEM 6.3 - SEI TUBERIA PVC 4'' (TRAMO T19_I1)
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setMemoryNamingMode('item_code_element')}
-                    className={`p-2 rounded-lg text-left text-xs border transition ${
-                      memoryNamingMode === 'item_code_element'
-                        ? 'bg-white border-[#004d99] text-[#004d99] shadow-2xs font-bold'
-                        : 'bg-white/70 border-slate-200 text-slate-700 hover:bg-white'
-                    }`}
-                  >
-                    <div className="font-semibold text-[11px]">Ítem Contractual • Elemento</div>
-                    <div className="text-[10px] text-slate-500 truncate">
-                      Ej: ÍTEM 6.3 • TRAMO T19_I1
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setMemoryNamingMode('element_and_item')}
-                    className={`p-2 rounded-lg text-left text-xs border transition ${
-                      memoryNamingMode === 'element_and_item'
-                        ? 'bg-white border-[#004d99] text-[#004d99] shadow-2xs font-bold'
-                        : 'bg-white/70 border-slate-200 text-slate-700 hover:bg-white'
-                    }`}
-                  >
-                    <div className="font-semibold text-[11px]">Elemento [Ítem Contractual]</div>
-                    <div className="text-[10px] text-slate-500 truncate">
-                      Ej: TRAMO T19_I1 [ÍTEM 6.3]
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setMemoryNamingMode('item_description')}
-                    className={`p-2 rounded-lg text-left text-xs border transition ${
-                      memoryNamingMode === 'item_description'
-                        ? 'bg-white border-[#004d99] text-[#004d99] shadow-2xs font-bold'
-                        : 'bg-white/70 border-slate-200 text-slate-700 hover:bg-white'
-                    }`}
-                  >
-                    <div className="font-semibold text-[11px]">Solo Ítem y Descripción</div>
-                    <div className="text-[10px] text-slate-500 truncate">
-                      Ej: MEMORIA TÉCNICA: ÍTEM 6.3 - SEI TUBERIA PVC 4''
-                    </div>
-                  </button>
-                </div>
-              </div>
-
-              {/* Selector de Ítem del Acta */}
-              <div className="space-y-1 pt-1 border-t border-amber-200/60">
-                <label className="text-[11px] font-semibold text-slate-700 flex items-center justify-between">
-                  <span>Asignación de Ítem Contractual:</span>
-                  <span className="text-[10px] text-slate-500 font-normal">
-                    {selectedItemCode === 'AUTO' ? 'Inferencia técnica activa' : `Fijado en ítem ${selectedItemCode}`}
-                  </span>
-                </label>
-                <select
-                  value={selectedItemCode}
-                  onChange={(e) => setSelectedItemCode(e.target.value)}
-                  className="w-full text-xs font-medium border border-slate-300 rounded-lg p-2 bg-white text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-[#004d99]"
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMemoryNamingMode('item_and_element')}
+                  className={`p-2 rounded-lg text-left text-xs border transition ${
+                    memoryNamingMode === 'item_and_element'
+                      ? 'bg-white border-[#004d99] text-[#004d99] shadow-2xs font-bold'
+                      : 'bg-white/70 border-slate-200 text-slate-700 hover:bg-white'
+                  }`}
                 >
-                  <option value="AUTO">
-                    ⚡ Automático: según ítem asignado o características técnicas (ej: PVC 4'', Cajas 0.9x0.9)
-                  </option>
-                  <optgroup label="Canalizaciones Principales y Tuberías">
-                    {ACTA_ITEM_OPTIONS.filter((item) => item.code.startsWith('6.') || item.code.startsWith('1.')).map((item) => (
-                      <option key={getActaItemKey(item)} value={item.code}>
-                        Ítem {item.code} ({item.unit}) - {item.description.slice(0, 65)}...
-                      </option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Redes de Media Tensión (MT) y Baja Tensión (BT)">
-                    {ACTA_ITEM_OPTIONS.filter((item) => !item.code.startsWith('6.') && !item.code.startsWith('1.')).map((item) => (
-                      <option key={getActaItemKey(item)} value={item.code}>
-                        Ítem {item.code} ({item.unit}) - {item.description.slice(0, 65)}...
-                      </option>
-                    ))}
-                  </optgroup>
-                </select>
+                  <div className="font-semibold text-[11px]">Ítem + Descripción (Elemento)</div>
+                  <div className="text-[10px] text-slate-500 truncate">
+                    {selectedItemSegment !== 'TODOS'
+                      ? `ÍTEM ${selectedItemSegment} - ${currentItemObj?.description.slice(0, 20)}... (TRAMO)`
+                      : "Ej: ÍTEM 6.3 - SEI TUBERIA PVC 4'' (TRAMO)"}
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setMemoryNamingMode('item_code_element')}
+                  className={`p-2 rounded-lg text-left text-xs border transition ${
+                    memoryNamingMode === 'item_code_element'
+                      ? 'bg-white border-[#004d99] text-[#004d99] shadow-2xs font-bold'
+                      : 'bg-white/70 border-slate-200 text-slate-700 hover:bg-white'
+                  }`}
+                >
+                  <div className="font-semibold text-[11px]">Ítem Contractual • Elemento</div>
+                  <div className="text-[10px] text-slate-500 truncate">
+                    {selectedItemSegment !== 'TODOS'
+                      ? `ÍTEM ${selectedItemSegment} • TRAMO`
+                      : 'Ej: ÍTEM 6.3 • TRAMO T19_I1'}
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setMemoryNamingMode('element_and_item')}
+                  className={`p-2 rounded-lg text-left text-xs border transition ${
+                    memoryNamingMode === 'element_and_item'
+                      ? 'bg-white border-[#004d99] text-[#004d99] shadow-2xs font-bold'
+                      : 'bg-white/70 border-slate-200 text-slate-700 hover:bg-white'
+                  }`}
+                >
+                  <div className="font-semibold text-[11px]">Elemento [Ítem Contractual]</div>
+                  <div className="text-[10px] text-slate-500 truncate">
+                    {selectedItemSegment !== 'TODOS'
+                      ? `TRAMO [ÍTEM ${selectedItemSegment}]`
+                      : 'Ej: TRAMO T19_I1 [ÍTEM 6.3]'}
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setMemoryNamingMode('item_description')}
+                  className={`p-2 rounded-lg text-left text-xs border transition ${
+                    memoryNamingMode === 'item_description'
+                      ? 'bg-white border-[#004d99] text-[#004d99] shadow-2xs font-bold'
+                      : 'bg-white/70 border-slate-200 text-slate-700 hover:bg-white'
+                  }`}
+                >
+                  <div className="font-semibold text-[11px]">Solo Ítem y Descripción</div>
+                  <div className="text-[10px] text-slate-500 truncate">
+                    {selectedItemSegment !== 'TODOS'
+                      ? `ÍTEM ${selectedItemSegment} - ${currentItemObj?.description.slice(0, 22)}...`
+                      : "Ej: ÍTEM 6.3 - SEI TUBERIA PVC 4''"}
+                  </div>
+                </button>
               </div>
             </div>
 
-            {/* 4. Tarjeta de Contenido que se Generará */}
+            {/* 5. Tarjeta de Contenido que se Generará */}
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2 text-xs">
               <div className="font-bold text-slate-700 flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-[16px] text-[#004d99]">info</span>
-                Contenido del Dossier Técnico Estructurado:
+                Resumen del Dossier a Generar:
               </div>
               <ul className="space-y-1.5 text-slate-600 pl-5 list-disc text-[11px]">
                 <li>
-                  <strong className="text-slate-800">Lámina de Plano General por Acta:</strong> Muestra el plano de obra con los trazados, cámaras y numeración de llamadas [1], [2], [3]...
+                  <strong className="text-slate-800">Lámina de Plano General:</strong> Trazados en alta resolución, rotulación en cajetín con número de acta {selectedItemSegment !== 'TODOS' ? `e ítem ${selectedItemSegment}` : ''} y llamadas direccionales [1], [2]...
                 </li>
                 <li>
-                  <strong className="text-slate-800">Fichas con Flechas Direccionales:</strong> Cada elemento incluye su foto de inspección al lado de un mini-croquis con flecha roja de alta visibilidad apuntando a su posición exacta.
+                  <strong className="text-slate-800">Fichas con Flechas Direccionales:</strong> Foto de campo + mini-croquis con flecha roja de alta visibilidad indicando la ubicación exacta.
                 </li>
                 <li>
-                  <strong className="text-slate-800">Metadatos de Obra:</strong> Códigos, metrajes presupuestados/ejecutados, tipo de red y notas de campo.
+                  <strong className="text-slate-800">Segmentación Contractual:</strong>{' '}
+                  {selectedItemSegment === 'TODOS'
+                    ? 'Informe completo con todos los ítems y elementos del acta.'
+                    : `Informe filtrado exclusivamente para el Ítem ${selectedItemSegment} (${currentItemObj?.description.slice(0, 45)}...).`}
                 </li>
               </ul>
               <div className="pt-2 border-t border-slate-200 flex flex-wrap items-center justify-between text-slate-700 text-xs">
                 <span>
-                  Total elementos a procesar: <strong>{totalElements}</strong>
+                  Elementos a procesar: <strong className="text-[#004d99]">{totalElements}</strong>
                 </span>
                 <span>
                   Estimación de páginas: <strong>~{estimatedPages} págs.</strong>
@@ -464,7 +661,7 @@ export const ActaPdfReportModal: React.FC<ActaPdfReportModalProps> = ({
                 className="flex-1 sm:flex-none px-3.5 py-2 border border-[#004d99] text-[#004d99] bg-white hover:bg-blue-50 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow-2xs disabled:opacity-50"
               >
                 <span className="material-symbols-outlined text-[16px]">visibility</span>
-                Previsualizar
+                Previsualizar {selectedItemSegment !== 'TODOS' ? `(Ítem ${selectedItemSegment})` : ''}
               </button>
 
               <button
@@ -474,7 +671,7 @@ export const ActaPdfReportModal: React.FC<ActaPdfReportModalProps> = ({
                 className="flex-1 sm:flex-none px-4 py-2 bg-[#004d99] hover:bg-[#003d7a] text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow-xs disabled:opacity-50"
               >
                 <span className="material-symbols-outlined text-[16px]">download</span>
-                Descargar PDF
+                Descargar PDF {selectedItemSegment !== 'TODOS' ? `(Ítem ${selectedItemSegment})` : ''}
               </button>
             </div>
           </div>
@@ -483,3 +680,4 @@ export const ActaPdfReportModal: React.FC<ActaPdfReportModalProps> = ({
     </div>
   );
 };
+

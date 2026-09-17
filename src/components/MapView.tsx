@@ -15,6 +15,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { BulkEditModal } from './BulkEditModal';
 import { ActaPdfReportModal } from './ActaPdfReportModal';
 import { BottomSheet } from './BottomSheet';
+import { PlanFloatingDock } from './PlanFloatingDock';
+import { ActasModalDialog } from './ActasModalDialog';
 import { getActaTheme } from '../services/obraAnalyticsService';
 
 interface MapViewProps {
@@ -1969,45 +1971,7 @@ export const MapView: React.FC<MapViewProps> = ({
           </button>
         ))}
         <span className="mx-1 hidden h-6 w-px bg-[#b8ced9] sm:block" aria-hidden="true" />
-        {isAdmin && (selectedPlanArea === 'civil' ? (
-          <>
-            <button type="button" onClick={() => activateCreation('caja')} className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold shadow-sm transition ${creationMode === 'caja' ? 'border-[#b77812] bg-[#b77812] text-white' : 'border-[#e0bf78] bg-white text-[#8b5d05] hover:bg-[#fff6df]'}`} title="Agregar caja directamente al plano"><span className="material-symbols-outlined text-[16px]">inventory_2</span>Caja</button>
-            <button type="button" onClick={() => activateCreation('camara')} className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold shadow-sm transition ${creationMode === 'camara' ? 'border-[#0566aa] bg-[#0566aa] text-white' : 'border-[#8ec6dd] bg-white text-[#075a91] hover:bg-[#e5f4fb]'}`} title="Agregar cámara directamente al plano"><span className="material-symbols-outlined text-[16px]">add_a_photo</span>Cámara</button>
-            <button type="button" onClick={() => activateCreation('tuberia')} className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold shadow-sm transition ${creationMode === 'tuberia' ? 'border-[#073f74] bg-[#073f74] text-white' : 'border-[#9fb5c5] bg-white text-[#173f58] hover:bg-[#eaf3f8]'}`} title="Agregar tramo de tubería directamente al plano"><span className="material-symbols-outlined text-[16px]">timeline</span>Tubería</button>
-          </>
-        ) : (
-          electricalOptionsForArea.map((element) => (
-            <button key={element.value} type="button" onClick={() => activateCreation(element.value)} className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold shadow-sm transition ${creationMode === element.value ? 'border-[#5b21b6] bg-[#5b21b6] text-white' : 'border-[#d8c3fb] bg-white text-[#5b21b6] hover:bg-[#f5f0ff]'}`} title={`Agregar ${element.label.toLowerCase()} al plano eléctrico`}><span className="material-symbols-outlined text-[16px]">{element.icon}</span>{element.shortLabel}</button>
-          ))
-        ))}
-        <button
-          type="button"
-          onClick={toggleMultipleSelectionMode}
-          className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold shadow-sm transition ${
-            isMultipleSelectionMode && !isAreaSelectionMode
-              ? 'border-[#004d99] bg-[#004d99] text-white shadow-xs'
-              : 'border-[#9fb5c5] bg-white text-[#173f58] hover:bg-[#eaf3f8]'
-          }`}
-          title="Selección múltiple para ajustar propiedades en grupo o eliminar"
-          aria-pressed={isMultipleSelectionMode}
-        >
-          <span className="material-symbols-outlined text-[16px]">select_all</span>
-          Ajuste Grupal
-        </button>
-        <button
-          type="button"
-          onClick={toggleAreaSelectionMode}
-          className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold shadow-sm transition ${
-            isAreaSelectionMode
-              ? 'border-[#004d99] bg-[#004d99] text-white shadow-xs ring-2 ring-[#004d99]/30'
-              : 'border-[#9fb5c5] bg-white text-[#173f58] hover:bg-[#eaf3f8]'
-          }`}
-          title="Seleccionar múltiples elementos mediante un recuadro de arrastre"
-          aria-pressed={isAreaSelectionMode}
-        >
-          <span className="material-symbols-outlined text-[16px]">highlight_alt</span>
-          Selección de Área
-        </button>
+        {/* Herramienta de Mano rápida */}
         <button
           type="button"
           onClick={toggleHandTool}
@@ -2020,9 +1984,10 @@ export const MapView: React.FC<MapViewProps> = ({
           aria-pressed={isHandToolActive}
         >
           <span className="material-symbols-outlined text-[16px]">pan_tool_alt</span>
-          {isHandToolActive ? 'Mano (Activa)' : 'Mano'}
+          {isHandToolActive ? 'Mano activa' : 'Mano [H]'}
         </button>
-        {/* Selector de Modo de Coloreado del Plano */}
+
+        {/* Modo de Coloreado del Plano */}
         <div className="inline-flex h-8 items-center rounded-full border border-[#9fb5c5] bg-[#eef3f5] p-0.5 text-[11px] font-bold shadow-xs">
           <button
             type="button"
@@ -2032,7 +1997,7 @@ export const MapView: React.FC<MapViewProps> = ({
             }}
             className={`inline-flex h-7 items-center gap-1 rounded-full px-2.5 transition ${
               mapColorMode === 'redes'
-                ? 'bg-white text-[#073f74] shadow-xs'
+                ? 'bg-white text-[#073f74] shadow-xs font-bold'
                 : 'text-[#58717d] hover:text-[#073f74]'
             }`}
             title="Colorear geometrías por tipo de red técnica (MT, BT, Datos)"
@@ -2049,70 +2014,28 @@ export const MapView: React.FC<MapViewProps> = ({
             }}
             className={`inline-flex h-7 items-center gap-1 rounded-full px-2.5 transition ${
               mapColorMode === 'actas'
-                ? 'bg-[#2563eb] text-white shadow-xs'
+                ? 'bg-[#2563eb] text-white shadow-xs font-bold'
                 : 'text-[#58717d] hover:text-[#2563eb]'
             }`}
             title="Colorear geometrías y textos por Acta y estado de facturación (Facturado vs Pendiente)"
           >
             <span className="material-symbols-outlined text-[15px]">palette</span>
-            Color por Actas
+            Actas
           </button>
         </div>
-        <button
-          type="button"
-          onClick={() => setAreActaLabelsVisible((visible) => !visible)}
-          className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold shadow-sm transition ${
-            areActaLabelsVisible
-              ? 'border-[#0b5d8c] bg-white text-[#075a91] hover:bg-[#e5f4fb]'
-              : 'border-[#afc0c9] bg-[#eef3f5] text-[#58717d] hover:bg-white'
-          }`}
-          title={areActaLabelsVisible ? 'Ocultar todos los rótulos de acta' : 'Mostrar todos los rótulos de acta'}
-          aria-pressed={areActaLabelsVisible}
-        >
-          <span className="material-symbols-outlined text-[16px]">{areActaLabelsVisible ? 'visibility' : 'visibility_off'}</span>
-          Actas
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            const firstActa = selectedActasFilter.length === 1 ? selectedActasFilter[0] : undefined;
-            setActaPdfInitialFilter(firstActa);
-            setIsActaPdfModalOpen(true);
-          }}
-          className="inline-flex h-8 items-center gap-1.5 rounded-full border border-red-200 bg-red-50/80 px-3 text-[11px] font-bold text-red-700 shadow-xs transition hover:bg-red-100 hover:border-red-300 active:scale-95"
-          title="Generar informe técnico en PDF por Actas (Dossier con plano general, foto de elemento y flecha localizadora)"
-        >
-          <span className="material-symbols-outlined text-[15px] text-red-600">picture_as_pdf</span>
-          Informe PDF
-        </button>
-        <button
-          type="button"
-          onClick={() => setAreCameraNamesVisible((visible) => !visible)}
-          className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold shadow-sm transition ${
-            areCameraNamesVisible
-              ? 'border-[#0b5d8c] bg-white text-[#075a91] hover:bg-[#e5f4fb]'
-              : 'border-[#afc0c9] bg-[#eef3f5] text-[#58717d] hover:bg-white'
-          }`}
-          title={areCameraNamesVisible ? 'Ocultar nombres de cámaras' : 'Mostrar nombres de cámaras'}
-          aria-pressed={areCameraNamesVisible}
-        >
-          <span className="material-symbols-outlined text-[16px]">{areCameraNamesVisible ? 'visibility' : 'visibility_off'}</span>
-          Nombres
-        </button>
-        <button
-          type="button"
-          onClick={() => setArePipeNamesVisible((visible) => !visible)}
-          className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold shadow-sm transition ${
-            arePipeNamesVisible
-              ? 'border-[#4f46e5] bg-white text-[#3730a3] hover:bg-indigo-50'
-              : 'border-[#afc0c9] bg-[#eef3f5] text-[#58717d] hover:bg-white'
-          }`}
-          title={arePipeNamesVisible ? 'Ocultar nombres de tramos' : 'Mostrar nombres de tramos'}
-          aria-pressed={arePipeNamesVisible}
-        >
-          <span className="material-symbols-outlined text-[16px]">{arePipeNamesVisible ? 'visibility' : 'visibility_off'}</span>
-          Tramos
-        </button>
+
+        {/* Creación rápida (Administrador) */}
+        {isAdmin && (selectedPlanArea === 'civil' ? (
+          <>
+            <button type="button" onClick={() => activateCreation('caja')} className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold shadow-sm transition ${creationMode === 'caja' ? 'border-[#b77812] bg-[#b77812] text-white' : 'border-[#e0bf78] bg-white text-[#8b5d05] hover:bg-[#fff6df]'}`} title="Agregar caja directamente al plano"><span className="material-symbols-outlined text-[16px]">inventory_2</span>+ Caja</button>
+            <button type="button" onClick={() => activateCreation('camara')} className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold shadow-sm transition ${creationMode === 'camara' ? 'border-[#0566aa] bg-[#0566aa] text-white' : 'border-[#8ec6dd] bg-white text-[#075a91] hover:bg-[#e5f4fb]'}`} title="Agregar cámara directamente al plano"><span className="material-symbols-outlined text-[16px]">add_a_photo</span>+ Cámara</button>
+            <button type="button" onClick={() => activateCreation('tuberia')} className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold shadow-sm transition ${creationMode === 'tuberia' ? 'border-[#073f74] bg-[#073f74] text-white' : 'border-[#9fb5c5] bg-white text-[#173f58] hover:bg-[#eaf3f8]'}`} title="Agregar tramo de tubería directamente al plano"><span className="material-symbols-outlined text-[16px]">timeline</span>+ Tubería</button>
+          </>
+        ) : (
+          electricalOptionsForArea.map((element) => (
+            <button key={element.value} type="button" onClick={() => activateCreation(element.value)} className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold shadow-sm transition ${creationMode === element.value ? 'border-[#5b21b6] bg-[#5b21b6] text-white' : 'border-[#d8c3fb] bg-white text-[#5b21b6] hover:bg-[#f5f0ff]'}`} title={`Agregar ${element.label.toLowerCase()} al plano eléctrico`}><span className="material-symbols-outlined text-[16px]">{element.icon}</span>+{element.shortLabel}</button>
+          ))
+        ))}
       </div>
       </div>
 
@@ -2723,258 +2646,6 @@ export const MapView: React.FC<MapViewProps> = ({
                 </React.Fragment>
               );
             })}
-
-            {/* Leyenda Flotante Modal e Interactiva de Codificación por Actas & Facturación */}
-            {mapColorMode === 'actas' && (
-              isActasMenuCollapsed ? (
-                <div
-                  className="absolute bottom-4 right-4 z-30 select-none pointer-events-auto"
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onTouchStart={(e) => e.stopPropagation()}
-                >
-                  <button
-                    type="button"
-                    onClick={() => toggleActasMenuCollapsed(false)}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-blue-300/80 bg-white/95 px-2.5 py-1 text-xs font-bold text-slate-800 shadow-md backdrop-blur-sm transition hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700 active:scale-95"
-                    title="Expandir ventana modal de Codificación por Actas"
-                  >
-                    <span className="material-symbols-outlined text-[15px] text-[#2563eb]">palette</span>
-                    <span className="text-[11px] font-bold text-slate-700">
-                      Actas{selectedActasFilter.length > 0 ? `: ${selectedActasFilter.join(' + ')}` : ''}
-                    </span>
-                    {selectedActasFilter.length > 0 && (
-                      <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[9px] font-bold text-white">
-                        {selectedActasFilter.length}
-                      </span>
-                    )}
-                    <span className="material-symbols-outlined text-[15px] text-slate-400">expand_less</span>
-                  </button>
-                </div>
-              ) : (
-                <div
-                  className="absolute bottom-4 right-4 z-30 w-64 rounded-xl border border-slate-200/90 bg-white/95 p-2.5 shadow-xl backdrop-blur-md transition-shadow select-none pointer-events-auto"
-                  style={{
-                    transform: `translate(${actasModalOffset.x}px, ${actasModalOffset.y}px)`,
-                  }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onTouchStart={(e) => e.stopPropagation()}
-                  onWheel={(e) => e.stopPropagation()}
-                >
-                  {/* Header de la ventana Modal (Movable & Collapsible) */}
-                  <div
-                    className="flex items-center justify-between border-b border-slate-100 pb-1.5 mb-1.5 cursor-grab active:cursor-grabbing select-none"
-                    onMouseDown={handleActasModalMouseDown}
-                    onTouchStart={handleActasModalTouchStart}
-                    title="Arrastra desde la barra para mover esta ventana modal por el plano"
-                  >
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-md bg-blue-50 text-[#2563eb] shrink-0">
-                        <span className="material-symbols-outlined text-[14px]">palette</span>
-                      </span>
-                      <span className="text-[11px] font-bold text-slate-800 truncate">
-                        Codificación por Actas
-                      </span>
-                      {selectedActasFilter.length > 0 && (
-                        <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1.5 text-[9px] font-bold text-white shrink-0">
-                          {selectedActasFilter.length}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-1 shrink-0">
-                      {selectedActasFilter.length > 0 ? (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedActasFilter([]);
-                          }}
-                          className="inline-flex items-center gap-0.5 text-[9.5px] font-bold text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 transition"
-                          title="Restablecer para mostrar todos los elementos en el plano"
-                        >
-                          <span>Todos</span>
-                          <span className="material-symbols-outlined text-[11px]">close</span>
-                        </button>
-                      ) : (
-                        <span className="text-[9.5px] font-semibold text-slate-400 px-1 py-0.5">
-                          Todos
-                        </span>
-                      )}
-                      {actasModalOffset.x !== 0 || actasModalOffset.y !== 0 ? (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setActasModalOffset({ x: 0, y: 0 });
-                          }}
-                          className="flex h-5 w-5 items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
-                          title="Restablecer posición original"
-                        >
-                          <span className="material-symbols-outlined text-[13px]">restart_alt</span>
-                        </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleActasMenuCollapsed(true);
-                        }}
-                        className="flex h-5 w-5 items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
-                        title="Colapsar / Minimizar menú modal"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">expand_more</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Subtítulo informativo */}
-                  <div className="flex items-center justify-between text-[9px] text-slate-500 pb-1 mb-1 border-b border-slate-50">
-                    <span className="font-medium text-slate-600 truncate">
-                      {selectedActasFilter.length === 0
-                        ? 'Haz clic para seleccionar 2 o más actas:'
-                        : `${selectedActasFilter.length} acta${selectedActasFilter.length > 1 ? 's' : ''} activa${selectedActasFilter.length > 1 ? 's' : ''} en plano:`}
-                    </span>
-                    {selectedActasFilter.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setSelectedActasFilter([])}
-                        className="font-bold text-blue-600 hover:text-blue-800 hover:underline shrink-0 ml-1 text-[8.5px]"
-                      >
-                        Limpiar
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Contenido / Botones de Actas con soporte de multiselección */}
-                  <div className="space-y-1 text-[10px] max-h-56 overflow-y-auto pr-0.5">
-                    {availableActas.map((item) => {
-                      const isSelected = selectedActasFilter.includes(item.key);
-                      const countInPlan = positionedPhotos.filter((p) => {
-                        const pActa = p.acta?.trim();
-                        if (item.key === 'Sin Acta') return !pActa || pActa.toLowerCase().includes('sin acta');
-                        return pActa === item.key || pActa?.toLowerCase() === item.key.toLowerCase();
-                      }).length;
-
-                      return (
-                        <div
-                          key={item.key}
-                          onClick={() => toggleActaSelection(item.key)}
-                          className={`group w-full flex items-center justify-between px-2 py-1 rounded-md border transition text-left cursor-pointer select-none ${
-                            isSelected
-                              ? 'ring-2 ring-blue-500 shadow-xs font-bold'
-                              : selectedActasFilter.length > 0
-                                ? 'opacity-60 hover:opacity-100 hover:bg-slate-50'
-                                : 'hover:bg-slate-50'
-                          }`}
-                          style={{
-                            borderColor: isSelected ? item.color : item.border,
-                            backgroundColor: isSelected ? item.bg : '#ffffff',
-                          }}
-                          title={`Clic para ${isSelected ? 'desmarcar' : 'incluir'} ${item.label} en la vista del plano`}
-                        >
-                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                            {/* Checkbox indicador de multiselección */}
-                            <span
-                              className={`flex h-3.5 w-3.5 items-center justify-center rounded border transition shrink-0 ${
-                                isSelected
-                                  ? 'border-blue-600 bg-blue-600 text-white'
-                                  : 'border-slate-300 bg-white group-hover:border-slate-400'
-                              }`}
-                              style={{
-                                borderColor: isSelected ? item.color : undefined,
-                                backgroundColor: isSelected ? item.color : '#ffffff',
-                              }}
-                            >
-                              {isSelected && (
-                                <span className="material-symbols-outlined text-[10px] leading-none text-white font-black">
-                                  check
-                                </span>
-                              )}
-                            </span>
-
-                            {/* Bullet circular de color */}
-                            <span
-                              className={`w-2.5 h-2.5 rounded-full flex items-center justify-center shrink-0 ${
-                                item.dashed ? 'border border-dashed' : ''
-                              }`}
-                              style={{ backgroundColor: item.dashed ? '#e2e8f0' : item.color, borderColor: item.color }}
-                            />
-
-                            <span className="font-semibold truncate text-[10.5px]" style={{ color: item.text }}>
-                              {item.label}
-                            </span>
-
-                            <span
-                              className="text-[7.5px] px-1 py-0.2 rounded font-sans border font-medium shrink-0"
-                              style={{ color: item.text, borderColor: item.border, backgroundColor: '#ffffff' }}
-                            >
-                              {item.estado}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-1 shrink-0 ml-1">
-                            <span className="text-[9.5px] font-mono font-bold text-slate-500">
-                              {countInPlan} elem
-                            </span>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                selectOnlyActa(item.key);
-                              }}
-                              className="opacity-0 group-hover:opacity-100 rounded px-1 py-0.5 text-[8px] font-bold text-slate-500 hover:text-blue-700 hover:bg-blue-50 transition border border-transparent hover:border-blue-200"
-                              title={`Aislar exclusivamente ${item.label}`}
-                            >
-                              Solo
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Resumen de elementos activos cuando hay filtro multiselección */}
-                  {selectedActasFilter.length > 0 && (
-                    <div className="mt-1.5 flex items-center justify-between rounded bg-blue-50/90 px-2 py-1 text-[9px] font-bold text-blue-800 border border-blue-100">
-                      <span className="flex items-center gap-1 truncate max-w-[150px]" title={selectedActasFilter.join(', ')}>
-                        <span className="material-symbols-outlined text-[12px] text-blue-600 shrink-0">visibility</span>
-                        <span className="truncate">{selectedActasFilter.join(' + ')}</span>
-                      </span>
-                      <span className="font-mono shrink-0">
-                        {positionedPhotos.filter((p) => isPhotoMatchingActaFilter(p, selectedActasFilter)).length} elem visibles
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Leyenda Footer compacta */}
-                  <div className="mt-1.5 pt-1 border-t border-slate-100 flex items-center justify-between text-[8.5px] text-slate-500">
-                    <span className="flex items-center gap-1">
-                      <span className="w-2.5 h-0.5 bg-[#2563eb]"></span> Sólido: Facturado
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <span className="w-2.5 h-0.5 border-b border-dashed border-slate-400"></span> Punteado: Pendiente
-                    </span>
-                  </div>
-
-                  {/* Botón de Exportación a PDF desde el modal de Actas */}
-                  <div className="mt-2 pt-1 border-t border-slate-100">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const firstActa = selectedActasFilter.length === 1 ? selectedActasFilter[0] : undefined;
-                        setActaPdfInitialFilter(firstActa);
-                        setIsActaPdfModalOpen(true);
-                      }}
-                      className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold transition shadow-xs"
-                      title="Generar informe técnico en PDF estructurado por actas con fotos y flechas señalizadoras"
-                    >
-                      <span className="material-symbols-outlined text-[14px]">picture_as_pdf</span>
-                      <span>Generar Dossier PDF {selectedActasFilter.length === 1 ? `(${selectedActasFilter[0]})` : ''}</span>
-                    </button>
-                  </div>
-                </div>
-              )
-            )}
             </div>
           </div>
         ) : (
@@ -3538,104 +3209,81 @@ export const MapView: React.FC<MapViewProps> = ({
         </div>
       )}
 
-      <div className="absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] right-2 z-20 hidden md:flex items-center gap-1.5 sm:bottom-4 sm:right-4 sm:gap-2">
-        {blueprint.imageUrl && <button
-          type="button"
-          onClick={() => {
-            setAreSecondaryAccessesCollapsed((collapsed) => {
-              if (!collapsed) setActiveMapPopover(null);
-              return !collapsed;
-            });
+      {/* Diálogo Flotante de Codificación por Actas (Escala 1:1, Compacto y Arrastrable) */}
+      {blueprint.imageUrl && mapColorMode === 'actas' && (
+        <ActasModalDialog
+          isCollapsed={isActasMenuCollapsed}
+          onToggleCollapsed={toggleActasMenuCollapsed}
+          offset={actasModalOffset}
+          onResetOffset={() => setActasModalOffset({ x: 0, y: 0 })}
+          onMouseDownHeader={handleActasModalMouseDown}
+          onTouchStartHeader={handleActasModalTouchStart}
+          availableActas={availableActas}
+          selectedActasFilter={selectedActasFilter}
+          onToggleActaSelection={toggleActaSelection}
+          onSelectOnlyActa={selectOnlyActa}
+          onClearSelection={() => setSelectedActasFilter([])}
+          positionedPhotos={positionedPhotos}
+          isPhotoMatchingActaFilter={isPhotoMatchingActaFilter}
+          onOpenPdfModal={(firstActa) => {
+            setActaPdfInitialFilter(firstActa);
+            setIsActaPdfModalOpen(true);
           }}
-          aria-label={areSecondaryAccessesCollapsed ? 'Mostrar accesos secundarios' : 'Ocultar accesos secundarios'}
-          aria-expanded={!areSecondaryAccessesCollapsed}
-          className="flex h-11 w-11 items-center justify-center rounded-xl border border-[#9fc4d4] bg-[#eaf6fb] text-[#075a91] shadow-sm transition hover:bg-[#dff2fa] sm:hidden"
-          title={areSecondaryAccessesCollapsed ? 'Mostrar accesos' : 'Ocultar accesos'}
-        >
-          <span className="material-symbols-outlined text-[21px]">{areSecondaryAccessesCollapsed ? 'unfold_more' : 'unfold_less'}</span>
-        </button>}
-        <div data-testid="secondary-map-accesses" className={areSecondaryAccessesCollapsed ? 'hidden sm:contents' : 'contents'}>
-        {blueprint.imageUrl && (
-          <button
-            type="button"
-            onClick={toggleHandTool}
-            aria-label={isHandToolActive ? 'Desactivar modo mano' : 'Activar modo mano'}
-            aria-pressed={isHandToolActive}
-            className={`flex h-11 w-11 items-center justify-center rounded-xl border p-0 text-xs font-bold shadow-sm transition sm:h-10 sm:w-auto sm:gap-1.5 sm:px-3 ${
-              isHandToolActive
-                ? 'border-[#073f74] bg-[#073f74] text-white ring-2 ring-[#073f74]/30 shadow-md'
-                : 'border-[#c7d7df] bg-white text-[#285b72] hover:bg-[#eaf6fb]'
-            }`}
-            title={isHandToolActive ? 'Desactivar mano de paneo (1 solo clic) [H / Esc]' : 'Activar mano para mover el plano (1 solo clic) [H]'}
-          >
-            <span className="material-symbols-outlined text-[20px] sm:text-[19px]">pan_tool_alt</span>
-            <span className="hidden md:inline">{isHandToolActive ? 'Mano (Activa)' : 'Mano'}</span>
-          </button>
-        )}
-        {blueprint.imageUrl && (
-          <div className="static sm:relative">
-            {activeMapPopover === 'view' && (
-              <div role="dialog" aria-label="Ajustes de vista del plano" className="fixed bottom-[calc(3.75rem+env(safe-area-inset-bottom))] left-2 right-2 max-h-[calc(100dvh-5.25rem)] overflow-y-auto rounded-xl border border-[#b7d4e1] bg-white shadow-[0_14px_30px_rgba(10,54,83,0.22)] sm:absolute sm:bottom-12 sm:left-auto sm:right-0 sm:max-h-[min(75vh,32rem)] sm:w-[min(20rem,calc(100vw-2rem))]">
-                <div className="flex items-center justify-between border-b border-[#d7e5eb] bg-[#f3faff] px-3 py-2.5">
-                  <div><p className="font-mono text-[10px] font-bold tracking-[0.12em] text-[#0566aa]">VISTA DEL PLANO</p><p className="mt-0.5 text-xs font-semibold text-[#24485b]">Escala y legibilidad</p></div>
-                  <button type="button" onClick={() => setActiveMapPopover(null)} className="grid h-7 w-7 place-items-center rounded-md text-[#486a7c] hover:bg-white" aria-label="Cerrar ajustes de vista"><span className="material-symbols-outlined text-[18px]">close</span></button>
-                </div>
-                <div className="divide-y divide-[#e1ebef] px-3">
-                  {[
-                    { label: 'Plano', value: Math.round(planScale * 100), icon: 'zoom_in', iconClass: 'text-[#0566aa]', decrease: () => adjustPlanScale(-0.25), increase: () => adjustPlanScale(0.25), decreaseDisabled: planScale <= 0.45, increaseDisabled: planScale >= 8, decreaseLabel: 'Reducir tamaño del plano', increaseLabel: 'Aumentar tamaño del plano' },
-                    { label: 'Iconos', value: Math.round(iconScale * 100), icon: 'ads_click', iconClass: 'text-[#b77812]', decrease: () => adjustIconScale(-0.1), increase: () => adjustIconScale(0.1), decreaseDisabled: iconScale <= 0.2, increaseDisabled: iconScale >= 1.8, decreaseLabel: 'Reducir tamaño de los iconos', increaseLabel: 'Aumentar tamaño de los iconos' },
-                    { label: 'Textos', value: Math.round(textScale * 100), icon: 'text_fields', iconClass: 'text-[#0b5d8c]', decrease: () => adjustTextScale(-0.1), increase: () => adjustTextScale(0.1), decreaseDisabled: textScale <= 0.25, increaseDisabled: textScale >= 1.8, decreaseLabel: 'Reducir tamaño de los textos del plano', increaseLabel: 'Aumentar tamaño de los textos del plano' },
-                  ].map((control) => (
-                    <div key={control.label} className="flex items-center gap-2 py-2.5">
-                      <span className={`material-symbols-outlined text-[18px] ${control.iconClass}`}>{control.icon}</span>
-                      <span className="flex-1 text-xs font-bold text-[#355c70]">{control.label} <span className="font-mono text-[#0b2940]">{control.value}%</span></span>
-                      <button type="button" onClick={control.decrease} disabled={control.decreaseDisabled} className="grid h-7 w-7 place-items-center rounded-md text-[#285b72] hover:bg-[#eaf6fb] disabled:cursor-not-allowed disabled:opacity-35" aria-label={control.decreaseLabel}><span className="material-symbols-outlined text-[17px]">remove</span></button>
-                      <button type="button" onClick={control.increase} disabled={control.increaseDisabled} className="grid h-7 w-7 place-items-center rounded-md text-[#285b72] hover:bg-[#eaf6fb] disabled:cursor-not-allowed disabled:opacity-35" aria-label={control.increaseLabel}><span className="material-symbols-outlined text-[17px]">add</span></button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            <button type="button" onClick={() => setActiveMapPopover((current) => current === 'view' ? null : 'view')} aria-label="Abrir ajustes de vista" aria-expanded={activeMapPopover === 'view'} aria-haspopup="dialog" className={`flex h-11 w-11 items-center justify-center rounded-xl border p-0 text-xs font-bold shadow-sm transition sm:h-10 sm:w-auto sm:gap-1.5 sm:px-3 ${activeMapPopover === 'view' ? 'border-[#073f74] bg-[#073f74] text-white' : 'border-[#c7d7df] bg-white text-[#285b72] hover:bg-[#eaf6fb]'}`} title="Abrir ajustes de vista">
-              <span className="material-symbols-outlined text-[20px] sm:text-[19px]">tune</span><span className="hidden md:inline">Vista</span>
-            </button>
-          </div>
-        )}
-        {blueprint.imageUrl && (
-          <div className="static sm:relative">
-            {activeMapPopover === 'tools' && (
-              <div role="dialog" aria-label="Herramientas del plano" className="fixed bottom-[calc(3.75rem+env(safe-area-inset-bottom))] left-2 right-2 max-h-[calc(100dvh-5.25rem)] overflow-y-auto rounded-xl border border-[#b7d4e1] bg-white shadow-[0_14px_30px_rgba(10,54,83,0.22)] sm:absolute sm:bottom-12 sm:left-auto sm:right-0 sm:max-h-[min(75vh,32rem)] sm:w-[min(20rem,calc(100vw-2rem))]">
-                <div className="flex items-center justify-between border-b border-[#d7e5eb] bg-[#f3faff] px-3 py-2.5">
-                  <div><p className="font-mono text-[10px] font-bold tracking-[0.12em] text-[#0566aa]">OPERACIÓN</p><p className="mt-0.5 text-xs font-semibold text-[#24485b]">Herramientas del plano</p></div>
-                  <button type="button" onClick={() => setActiveMapPopover(null)} className="grid h-7 w-7 place-items-center rounded-md text-[#486a7c] hover:bg-white" aria-label="Cerrar herramientas del plano"><span className="material-symbols-outlined text-[18px]">close</span></button>
-                </div>
-                <div className="space-y-2.5 p-3">
-                  {isAdmin ? (
-                    <button type="button" onClick={() => { setActiveMapPopover(null); startCalibration(); }} className={`flex w-full items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-xs font-bold transition ${blueprint.calibration ? 'border-[#6ca9c5] bg-[#eaf6fb] text-[#075a91] hover:bg-[#dff2fa]' : 'border-[#e0bf78] bg-[#fffaf0] text-[#8b5d05] hover:bg-[#fff2d6]'}`}>
-                      <span className="material-symbols-outlined text-[19px]">straighten</span><span className="flex-1">{blueprint.calibration ? 'Escala activa' : 'Calibrar plano'}</span><span className="material-symbols-outlined text-[17px]">chevron_right</span>
-                    </button>
-                  ) : (
-                    <button type="button" disabled aria-label="Calibración disponible solo para administradores" className="flex w-full cursor-not-allowed items-center gap-2 rounded-lg border border-[#d7e2e7] bg-[#f5f8fa] px-3 py-2.5 text-left text-xs font-bold text-[#718692] opacity-85">
-                      <span className="material-symbols-outlined text-[19px]">lock</span><span className="flex-1">Calibración del administrador</span><span className="text-[10px] font-medium">Solo lectura</span>
-                    </button>
-                  )}
-                  <div className="rounded-lg border border-[#d7e5eb] bg-[#fbfdfe] px-3 py-2 text-xs text-[#426373]"><strong className="text-[#0b2940]">{photos.filter((photo) => isPlaced(photo)).length}</strong> ubicados · <strong className="text-[#0b2940]">{totalPipelineMeters.toFixed(1)} m</strong> de tubería</div>
-                  <button type="button" onClick={toggleHandTool} className={`flex w-full items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-xs font-bold transition ${isHandToolActive ? 'border-[#073f74] bg-[#073f74] text-white' : 'border-[#c7d7df] bg-white text-[#285b72] hover:bg-[#eaf6fb]'}`} aria-pressed={isHandToolActive}>
-                    <span className="material-symbols-outlined text-[19px]">pan_tool_alt</span><span className="flex-1">{isHandToolActive ? 'Mano activa (clic para desactivar)' : 'Activar mano (1 solo clic)'}</span><span className="text-[10px] font-medium">Mover plano</span>
-                  </button>
-                </div>
-              </div>
-            )}
-            <button type="button" onClick={() => setActiveMapPopover((current) => current === 'tools' ? null : 'tools')} aria-label="Abrir herramientas del plano" aria-expanded={activeMapPopover === 'tools'} aria-haspopup="dialog" className={`flex h-11 w-11 items-center justify-center rounded-xl border p-0 text-xs font-bold shadow-sm transition sm:h-10 sm:w-auto sm:gap-1.5 sm:px-3 ${activeMapPopover === 'tools' ? 'border-[#073f74] bg-[#073f74] text-white' : 'border-[#c7d7df] bg-white text-[#285b72] hover:bg-[#eaf6fb]'}`} title="Abrir herramientas del plano">
-              <span className="material-symbols-outlined text-[20px] sm:text-[19px]">construction</span><span className="hidden md:inline">Herramientas</span>
-            </button>
-          </div>
-        )}
-        <button type="button" onClick={() => { setActiveMapPopover(null); setIsFullscreen((value) => !value); }} className="flex h-11 w-11 items-center justify-center rounded-xl border border-[#c7d7df] bg-white text-[#285b72] shadow-sm transition hover:bg-[#eaf6fb] sm:h-10 sm:w-10" title={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}>
-          <span className="material-symbols-outlined text-[21px] sm:text-[20px]">{isFullscreen ? 'fullscreen_exit' : 'fullscreen'}</span>
-        </button>
-        </div>
-      </div>
+        />
+      )}
+
+      {/* Dock Flotante Inteligente y Colapsable (Menús Radiales de Capas, Herramientas y Visor) */}
+      {blueprint.imageUrl && (
+        <PlanFloatingDock
+          areCameraNamesVisible={areCameraNamesVisible}
+          onToggleCameraNames={() => setAreCameraNamesVisible((v) => !v)}
+          arePipeNamesVisible={arePipeNamesVisible}
+          onTogglePipeNames={() => setArePipeNamesVisible((v) => !v)}
+          areActaLabelsVisible={areActaLabelsVisible}
+          onToggleActaLabels={() => setAreActaLabelsVisible((v) => !v)}
+          mapColorMode={mapColorMode}
+          onSetMapColorMode={(mode) => {
+            setMapColorMode(mode);
+            if (mode === 'actas') {
+              setAreActaLabelsVisible(true);
+              setIsActasMenuCollapsed(false);
+            } else {
+              setSelectedActasFilter([]);
+            }
+          }}
+          isHandToolActive={isHandToolActive}
+          onToggleHandTool={toggleHandTool}
+          isAdmin={isAdmin}
+          creationMode={creationMode}
+          onActivateCreation={activateCreation}
+          isMultipleSelectionMode={isMultipleSelectionMode}
+          onToggleMultipleSelectionMode={toggleMultipleSelectionMode}
+          isAreaSelectionMode={isAreaSelectionMode}
+          onToggleAreaSelectionMode={toggleAreaSelectionMode}
+          onStartCalibration={startCalibration}
+          isCalibrated={Boolean(blueprint.calibration)}
+          onOpenPdfReport={() => {
+            const firstActa = selectedActasFilter.length === 1 ? selectedActasFilter[0] : undefined;
+            setActaPdfInitialFilter(firstActa);
+            setIsActaPdfModalOpen(true);
+          }}
+          isFullscreen={isFullscreen}
+          onToggleFullscreen={() => setIsFullscreen((v) => !v)}
+          planScale={planScale}
+          onAdjustPlanScale={adjustPlanScale}
+          iconScale={iconScale}
+          onAdjustIconScale={adjustIconScale}
+          textScale={textScale}
+          onAdjustTextScale={adjustTextScale}
+          onResetView={() => {
+            setPanOffset({ x: 0, y: 0 });
+            setBlueprint((prev) => ({ ...prev, scale: 1 }));
+          }}
+          placedCount={photos.filter((p) => isPlaced(p)).length}
+          totalPipelineMeters={totalPipelineMeters}
+          selectedPlanArea={selectedPlanArea}
+        />
+      )}
 
       {isPanelOpen && (
         <div className="fixed inset-0 z-40">
