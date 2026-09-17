@@ -196,9 +196,12 @@ export type MemoryNamingMode =
   | 'element_and_item' // "FICHA / MEMORIA TÉCNICA #1: TRAMO T19_I1 [ÍTEM 6.3]"
   | 'element_only'; // "FICHA / MEMORIA TÉCNICA #1: TRAMO T19_I1"
 
+export type PhotosPerMemory = 1 | 2 | 3 | 4 | 'all';
+
 export interface PdfReportOptions {
   selectedActas?: string[]; // Si está vacío o contiene 'TODAS', incluye todas las actas
   selectedItemCode?: string; // Código de ítem contractual para segmentar (ej: '3.65', o 'TODOS' para completo)
+  photosPerMemory?: PhotosPerMemory; // Cantidad de fotos por memoria técnica (1, 2, 3, 4, o 'all' para todas las posibles)
   includePhotos?: boolean;
   includeMiniMapArrows?: boolean;
   projectName?: string;
@@ -971,7 +974,190 @@ async function renderMiniCroquisArrowCanvas(
 }
 
 /**
- * Renderiza la Foto del elemento en un canvas con badge técnico y proporción ajustada
+ * Elemento individual de evidencia fotográfica para la ficha
+ */
+export interface PhotoEvidenceItem {
+  url: string;
+  label: string;
+  date?: string;
+  isCover: boolean;
+}
+
+/**
+ * Resuelve la lista de fotos de evidencia disponibles para un elemento determinado,
+ * combinando IndexedDB local, timeline de capturas, lista de fotos e imagen principal.
+ */
+export async function resolvePhotoEvidenceList(
+  photo: InspectionPhoto,
+  maxAllowed: number = 4,
+): Promise<PhotoEvidenceItem[]> {
+  const result: PhotoEvidenceItem[] = [];
+  const seenUrls = new Set<string>();
+
+  const isInvalidUrl = (u?: string | null) =>
+    !u || typeof u !== 'string' || !u.trim() || u.startsWith('data:image/svg+xml');
+
+  const add = (url?: string | null, date?: string, customLabel?: string) => {
+    if (isInvalidUrl(url)) return;
+    const clean = url!.trim();
+    if (seenUrls.has(clean)) return;
+    seenUrls.add(clean);
+    const index = result.length;
+    result.push({
+      url: clean,
+      date: date || photo.date,
+      label: customLabel || (index === 0 ? '#1 Portada' : `#${index + 1} Avance`),
+      isCover: index === 0,
+    });
+  };
+
+  // 1. Cargar desde IndexedDB (imágenes de campo guardadas localmente en alta resolución)
+  try {
+    const cached = await loadEvidenceImages(photo.id);
+    if (Array.isArray(cached) && cached.length > 0) {
+      cached.forEach((u, i) => add(u, undefined, i === 0 ? '#1 Portada' : `#${i + 1} Evidencia`));
+    }
+  } catch {
+    // Si falla indexedDB, continuar
+  }
+
+  // 2. Timeline de evidencias capturadas
+  if (Array.isArray(photo.evidenceTimeline) && photo.evidenceTimeline.length > 0) {
+    photo.evidenceTimeline.forEach((entry, i) => {
+      if (entry?.url) {
+        add(entry.url, entry.capturedAt, i === 0 ? '#1 Portada' : `#${i + 1} Avance`);
+      }
+    });
+  }
+
+  // 3. Array de URLs de fotos del elemento
+  if (Array.isArray(photo.imageUrls) && photo.imageUrls.length > 0) {
+    photo.imageUrls.forEach((u, i) => {
+      add(u, undefined, i === 0 ? '#1 Portada' : `#${i + 1} Detalle`);
+    });
+  }
+
+  // 4. Imagen principal como respaldo
+  if (photo.imageUrl) {
+    add(photo.imageUrl, photo.date, '#1 Portada');
+  }
+
+  const limit = maxAllowed > 0 ? maxAllowed : 4;
+  return result.slice(0, limit);
+}
+
+/**
+ * Renderiza una foto individual en canvas con badge y fecha
+ */
+async function renderSinglePhotoCanvas(
+  url: string,
+  width: number,
+  height: number,
+  badgeText: string,
+  dateText?: string,
+): Promise<string> {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return '';
+
+  const img = await loadImageSafe(url);
+  if (img && img.width > 0 && img.height > 0) {
+    const hRatio = width / img.width;
+    const vRatio = height / img.height;
+    const ratio = Math.max(hRatio, vRatio);
+    const centerShiftX = (width - img.width * ratio) / 2;
+    const centerShiftY = (height - img.height * ratio) / 2;
+
+    ctx.drawImage(
+      img,
+      0,
+      0,
+      img.width,
+      img.height,
+      centerShiftX,
+      centerShiftY,
+      img.width * ratio,
+      img.height * ratio,
+    );
+
+    // Barra inferior con badge técnico y fecha
+    const barH = Math.min(28, Math.max(18, height * 0.14));
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+    ctx.fillRect(0, height - barH, width, barH);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold ${Math.round(barH * 0.52)}px Helvetica, Arial, sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(badgeText, 8, height - barH / 2);
+
+    if (dateText && width > 180) {
+      ctx.textAlign = 'right';
+      ctx.font = `${Math.round(barH * 0.44)}px Helvetica, Arial, sans-serif`;
+      ctx.fillText(`Captura: ${dateText}`, width - 8, height - barH / 2);
+    }
+
+    ctx.strokeStyle = '#cbd5e1';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(0, 0, width, height);
+    return canvas.toDataURL('image/jpeg', 0.88);
+  }
+
+  // Tarjeta de respaldo si falla carga de la imagen
+  ctx.fillStyle = '#f1f5f9';
+  ctx.fillRect(0, 0, width, height);
+  ctx.strokeStyle = '#cbd5e1';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(0, 0, width, height);
+  ctx.fillStyle = '#64748b';
+  ctx.font = 'bold 12px Helvetica, Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(badgeText, width / 2, height / 2);
+  return canvas.toDataURL('image/jpeg', 0.85);
+}
+
+/**
+ * Renderiza la tarjeta sustituta cuando el elemento no posee fotos reales
+ */
+async function renderPlaceholderEvidenceCanvas(
+  photo: InspectionPhoto,
+  width: number = 600,
+  height: number = 450,
+): Promise<string> {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return '';
+
+  ctx.fillStyle = '#e2e8f0';
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.strokeStyle = '#94a3b8';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(15, 15, width - 30, height - 30);
+
+  ctx.fillStyle = '#475569';
+  ctx.font = 'bold 20px Helvetica, Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('EVIDENCIA FOTOGRÁFICA TÉCNICA', width / 2, height / 2 - 30);
+
+  ctx.font = '14px Helvetica, Arial, sans-serif';
+  ctx.fillText(`Elemento: ${photo.cameraCode || photo.name}`, width / 2, height / 2 + 10);
+  ctx.fillText(`Tipo: ${getElementType(photo).toUpperCase()}`, width / 2, height / 2 + 35);
+
+  ctx.fillStyle = '#64748b';
+  ctx.font = '11px monospace';
+  ctx.fillText(`Coordenadas: ${photo.planX?.toFixed(1) ?? '0'}%, ${photo.planY?.toFixed(1) ?? '0'}%`, width / 2, height / 2 + 65);
+
+  return canvas.toDataURL('image/jpeg', 0.85);
+}
+
+/**
+ * Renderiza la Foto del elemento en un canvas con badge técnico y proporción ajustada (versión legacy)
  */
 async function renderPhotoEvidenceCanvas(photo: InspectionPhoto): Promise<string> {
   const width = 600;
@@ -1024,28 +1210,169 @@ async function renderPhotoEvidenceCanvas(photo: InspectionPhoto): Promise<string
     }
   }
 
-  // Si no hay foto real o falla, dibujar tarjeta técnica sustituta
-  ctx.fillStyle = '#e2e8f0';
-  ctx.fillRect(0, 0, width, height);
+  return renderPlaceholderEvidenceCanvas(photo, width, height);
+}
 
-  ctx.strokeStyle = '#94a3b8';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(15, 15, width - 30, height - 30);
+/**
+ * Dibuja la sección fotográfica de la memoria técnica de acuerdo a la cantidad de fotos seleccionada
+ */
+async function drawPhotoEvidenceSection(
+  doc: jsPDF,
+  photo: InspectionPhoto,
+  startX: number,
+  startY: number,
+  colW: number,
+  colH: number,
+  elementsPerPage: 1 | 2,
+  photosPerMemory: PhotosPerMemory = 1,
+): Promise<number> {
+  const maxRequested = photosPerMemory === 'all'
+    ? (elementsPerPage === 1 ? 6 : 4)
+    : Number(photosPerMemory) || 1;
 
-  ctx.fillStyle = '#475569';
-  ctx.font = 'bold 20px Helvetica, Arial, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('EVIDENCIA FOTOGRÁFICA TÉCNICA', width / 2, height / 2 - 30);
+  const evidenceList = await resolvePhotoEvidenceList(photo, maxRequested);
 
-  ctx.font = '14px Helvetica, Arial, sans-serif';
-  ctx.fillText(`Elemento: ${photo.cameraCode || photo.name}`, width / 2, height / 2 + 10);
-  ctx.fillText(`Tipo: ${getElementType(photo).toUpperCase()}`, width / 2, height / 2 + 35);
+  // Si no hay fotos reales cargadas, dibujar tarjeta sustituta
+  if (evidenceList.length === 0) {
+    const placeholderImg = await renderPlaceholderEvidenceCanvas(photo, 600, 450);
+    if (placeholderImg) {
+      doc.addImage(placeholderImg, 'JPEG', startX, startY, colW, colH);
+      doc.setDrawColor(203, 213, 225);
+      doc.setLineWidth(0.3);
+      doc.rect(startX, startY, colW, colH);
+    }
+    return 0;
+  }
 
-  ctx.fillStyle = '#64748b';
-  ctx.font = '11px monospace';
-  ctx.fillText(`Coordenadas: ${photo.planX?.toFixed(1) ?? '0'}%, ${photo.planY?.toFixed(1) ?? '0'}%`, width / 2, height / 2 + 65);
+  const count = evidenceList.length;
 
-  return canvas.toDataURL('image/jpeg', 0.85);
+  if (count === 1) {
+    // 1 Foto (Ocupa todo el espacio de la columna)
+    const item = evidenceList[0];
+    const badge = photo.displayId ? `#1 Portada • ${photo.displayId}` : '#1 Portada';
+    const imgData = await renderSinglePhotoCanvas(item.url, 640, 480, badge, item.date);
+    if (imgData) {
+      doc.addImage(imgData, 'JPEG', startX, startY, colW, colH);
+      doc.setDrawColor(203, 213, 225);
+      doc.setLineWidth(0.3);
+      doc.rect(startX, startY, colW, colH);
+    }
+  } else if (count === 2) {
+    if (elementsPerPage === 1) {
+      // 2 fotos apiladas verticalmente (amplia altura disponible)
+      const gap = 2;
+      const subH = (colH - gap) / 2;
+      for (let idx = 0; idx < 2; idx++) {
+        const item = evidenceList[idx];
+        const curY = startY + idx * (subH + gap);
+        const imgData = await renderSinglePhotoCanvas(item.url, 640, 360, item.label, item.date);
+        if (imgData) {
+          doc.addImage(imgData, 'JPEG', startX, curY, colW, subH);
+          doc.setDrawColor(203, 213, 225);
+          doc.setLineWidth(0.3);
+          doc.rect(startX, curY, colW, subH);
+        }
+      }
+    } else {
+      // 2 fotos lado a lado horizontalmente (ideal para 2 elem/pág)
+      const gap = 2;
+      const subW = (colW - gap) / 2;
+      for (let idx = 0; idx < 2; idx++) {
+        const item = evidenceList[idx];
+        const curX = startX + idx * (subW + gap);
+        const imgData = await renderSinglePhotoCanvas(item.url, 480, 600, item.label, item.date);
+        if (imgData) {
+          doc.addImage(imgData, 'JPEG', curX, startY, subW, colH);
+          doc.setDrawColor(203, 213, 225);
+          doc.setLineWidth(0.3);
+          doc.rect(curX, startY, subW, colH);
+        }
+      }
+    }
+  } else if (count === 3) {
+    if (elementsPerPage === 1) {
+      // Foto 1 arriba (ancho completo), Fotos 2 y 3 abajo lado a lado
+      const gap = 2;
+      const topH = (colH - gap) * 0.52;
+      const botH = (colH - gap) * 0.48;
+      const subW = (colW - gap) / 2;
+
+      // Foto 1
+      const item1 = evidenceList[0];
+      const imgData1 = await renderSinglePhotoCanvas(item1.url, 640, 360, item1.label, item1.date);
+      if (imgData1) {
+        doc.addImage(imgData1, 'JPEG', startX, startY, colW, topH);
+        doc.setDrawColor(203, 213, 225);
+        doc.setLineWidth(0.3);
+        doc.rect(startX, startY, colW, topH);
+      }
+
+      // Fotos 2 y 3
+      const botY = startY + topH + gap;
+      for (let idx = 1; idx < 3; idx++) {
+        const item = evidenceList[idx];
+        const curX = startX + (idx - 1) * (subW + gap);
+        const imgData = await renderSinglePhotoCanvas(item.url, 480, 480, item.label, item.date);
+        if (imgData) {
+          doc.addImage(imgData, 'JPEG', curX, botY, subW, botH);
+          doc.setDrawColor(203, 213, 225);
+          doc.setLineWidth(0.3);
+          doc.rect(curX, botY, subW, botH);
+        }
+      }
+    } else {
+      // Foto 1 a la izquierda (altura completa), Fotos 2 y 3 a la derecha apiladas
+      const gap = 2;
+      const subW = (colW - gap) / 2;
+      const subH = (colH - gap) / 2;
+
+      // Foto 1
+      const item1 = evidenceList[0];
+      const imgData1 = await renderSinglePhotoCanvas(item1.url, 480, 600, item1.label, item1.date);
+      if (imgData1) {
+        doc.addImage(imgData1, 'JPEG', startX, startY, subW, colH);
+        doc.setDrawColor(203, 213, 225);
+        doc.setLineWidth(0.3);
+        doc.rect(startX, startY, subW, colH);
+      }
+
+      // Fotos 2 y 3
+      const rightX = startX + subW + gap;
+      for (let idx = 1; idx < 3; idx++) {
+        const item = evidenceList[idx];
+        const curY = startY + (idx - 1) * (subH + gap);
+        const imgData = await renderSinglePhotoCanvas(item.url, 480, 320, item.label, item.date);
+        if (imgData) {
+          doc.addImage(imgData, 'JPEG', rightX, curY, subW, subH);
+          doc.setDrawColor(203, 213, 225);
+          doc.setLineWidth(0.3);
+          doc.rect(rightX, curY, subW, subH);
+        }
+      }
+    }
+  } else {
+    // 4 fotos (o cuadrícula 2x2)
+    const gap = 2;
+    const subW = (colW - gap) / 2;
+    const subH = (colH - gap) / 2;
+
+    for (let idx = 0; idx < Math.min(4, count); idx++) {
+      const col = idx % 2;
+      const row = Math.floor(idx / 2);
+      const curX = startX + col * (subW + gap);
+      const curY = startY + row * (subH + gap);
+      const item = evidenceList[idx];
+      const imgData = await renderSinglePhotoCanvas(item.url, 480, 360, item.label, item.date);
+      if (imgData) {
+        doc.addImage(imgData, 'JPEG', curX, curY, subW, subH);
+        doc.setDrawColor(203, 213, 225);
+        doc.setLineWidth(0.3);
+        doc.rect(curX, curY, subW, subH);
+      }
+    }
+  }
+
+  return count;
 }
 
 /**
@@ -1058,6 +1385,8 @@ export async function generateActaDossierPdf(
   const {
     selectedActas = [],
     selectedItemCode = 'TODOS',
+    photosPerMemory = 1,
+    elementsPerPage = 2,
     projectName = 'Inspección y Control de Obra Eléctrica & Redes',
     inspector: _inspector,
     memoryNamingMode = 'item_and_element',
@@ -1493,19 +1822,25 @@ export async function generateActaDossierPdf(
         const colH = elementsPerPage === 1 ? 95 : 55;
         const imgTopY = cardTopY + 10.5;
 
-        // --- COLUMNA 1: FOTO DE INSPECCIÓN ---
+        // --- COLUMNA 1: EVIDENCIA(S) FOTOGRÁFICA(S) DE CAMPO ---
+        const renderedPhotosCount = await drawPhotoEvidenceSection(
+          doc,
+          photo,
+          margin + 2,
+          imgTopY,
+          colW,
+          colH,
+          elementsPerPage,
+          photosPerMemory,
+        );
+
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(7.2);
         doc.setTextColor(71, 85, 105);
-        doc.text('EVIDENCIA FOTOGRÁFICA DE CAMPO', margin + 3, imgTopY - 1.2);
-
-        const photoImgData = await renderPhotoEvidenceCanvas(photo);
-        if (photoImgData) {
-          doc.addImage(photoImgData, 'JPEG', margin + 2, imgTopY, colW, colH);
-          doc.setDrawColor(203, 213, 225);
-          doc.setLineWidth(0.3);
-          doc.rect(margin + 2, imgTopY, colW, colH);
-        }
+        const photoColHeader = renderedPhotosCount > 1
+          ? `EVIDENCIAS FOTOGRÁFICAS DE CAMPO (${renderedPhotosCount} FOTOS)`
+          : 'EVIDENCIA FOTOGRÁFICA DE CAMPO';
+        doc.text(photoColHeader, margin + 3, imgTopY - 1.2);
 
         // --- COLUMNA 2: MINI-CROQUIS LOCALIZADOR CON FLECHA ---
         const col2X = margin + colW + 6;

@@ -4,6 +4,7 @@ import {
   generateActaDossierPdf,
   groupPhotosByActa,
   MemoryNamingMode,
+  PhotosPerMemory,
   getPhotoMatchedItems,
   doesPhotoMatchItem,
 } from '../services/pdfReportService';
@@ -30,6 +31,7 @@ export const ActaPdfReportModal: React.FC<ActaPdfReportModalProps> = ({
   const [selectedItemSegment, setSelectedItemSegment] = useState<string>(initialItemFilter || 'TODOS');
   const [itemSearchText, setItemSearchText] = useState<string>('');
   const [elementsPerPage, setElementsPerPage] = useState<1 | 2>(2);
+  const [photosPerMemory, setPhotosPerMemory] = useState<PhotosPerMemory>(1);
   const [memoryNamingMode, setMemoryNamingMode] = useState<MemoryNamingMode>('item_and_element');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [progressPercent, setProgressPercent] = useState<number>(0);
@@ -100,6 +102,29 @@ export const ActaPdfReportModal: React.FC<ActaPdfReportModalProps> = ({
     return segmentedTargetGroups.reduce((sum, g) => sum + g.photos.length, 0);
   }, [segmentedTargetGroups]);
 
+  const photoCountStats = useMemo(() => {
+    let totalPhotos = 0;
+    let elementsWithMultiplePhotos = 0;
+    let maxPhotosInSingleElement = 1;
+
+    const allPhotosInScope = segmentedTargetGroups.flatMap((g) => g.photos);
+    allPhotosInScope.forEach((p) => {
+      const count = Array.isArray(p.imageUrls) && p.imageUrls.length > 0
+        ? p.imageUrls.length
+        : (p.imageUrl ? 1 : 0);
+      totalPhotos += count;
+      if (count > 1) elementsWithMultiplePhotos += 1;
+      if (count > maxPhotosInSingleElement) maxPhotosInSingleElement = count;
+    });
+
+    return {
+      totalPhotos,
+      elementsWithMultiplePhotos,
+      maxPhotosInSingleElement,
+      totalElements: allPhotosInScope.length,
+    };
+  }, [segmentedTargetGroups]);
+
   const estimatedPages = useMemo(() => {
     let pages = 0;
     segmentedTargetGroups.forEach((g) => {
@@ -121,6 +146,7 @@ export const ActaPdfReportModal: React.FC<ActaPdfReportModalProps> = ({
       const blob = await generateActaDossierPdf(photos, {
         selectedActas: selectedActa === 'TODAS' ? [] : [selectedActa],
         selectedItemCode: selectedItemSegment,
+        photosPerMemory,
         elementsPerPage,
         inspector,
         projectName: 'Inspección de Redes Eléctricas y Obra',
@@ -143,7 +169,8 @@ export const ActaPdfReportModal: React.FC<ActaPdfReportModalProps> = ({
         const dateStr = new Date().toISOString().slice(0, 10);
         const actaSuffix = selectedActa === 'TODAS' ? 'Todas_Actas' : selectedActa.replace(/\s+/g, '_');
         const itemSuffix = selectedItemSegment === 'TODOS' ? 'Completo' : `Item_${selectedItemSegment.replace(/\./g, '_')}`;
-        link.download = `Informe_Dossier_${actaSuffix}_${itemSuffix}_${dateStr}.pdf`;
+        const photosSuffix = photosPerMemory === 'all' ? 'TodasFotos' : `${photosPerMemory}Fotos`;
+        link.download = `Informe_Dossier_${actaSuffix}_${itemSuffix}_${photosSuffix}_${dateStr}.pdf`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -498,12 +525,86 @@ export const ActaPdfReportModal: React.FC<ActaPdfReportModalProps> = ({
               </div>
             </div>
 
-            {/* 4. Nomenclatura de la Memoria Técnica de acuerdo al Ítem del Acta */}
+            {/* 4. Cantidad de Fotos por cada Memoria / Ficha Técnica */}
+            <div className="bg-sky-50/60 border border-sky-200 rounded-xl p-3.5 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-sky-950 uppercase tracking-wide flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[17px] text-sky-700">photo_library</span>
+                  4. Cantidad de Fotos por Memoria Técnica:
+                </label>
+                <span className="text-[10px] bg-sky-200/70 text-sky-900 font-semibold px-2 py-0.5 rounded-full">
+                  Evidencias de Campo
+                </span>
+              </div>
+
+              <p className="text-[11px] text-sky-900/80 leading-relaxed">
+                Selecciona la cantidad de fotos que deseas incluir en cada ficha de memoria técnica. El diseño se adapta automáticamente garantizando nitidez técnica:
+              </p>
+
+              {/* Botones de Selección de Cantidad de Fotos */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                {[
+                  { value: 1 as const, label: '1 Foto', desc: 'Foto de Portada', icon: 'photo' },
+                  { value: 2 as const, label: '2 Fotos', desc: 'Portada + Avance', icon: 'filter_2' },
+                  { value: 3 as const, label: '3 Fotos', desc: 'Hasta 3 fotos', icon: 'filter_3' },
+                  { value: 4 as const, label: '4 Fotos', desc: 'Cuadrícula 2x2', icon: 'grid_view' },
+                  { value: 'all' as const, label: 'Todas', desc: 'Máximo posible', icon: 'collections' },
+                ].map((opt) => {
+                  const isSelected = photosPerMemory === opt.value;
+                  return (
+                    <button
+                      key={String(opt.value)}
+                      type="button"
+                      onClick={() => setPhotosPerMemory(opt.value)}
+                      className={`p-2 rounded-xl text-left border transition flex flex-col justify-between ${
+                        isSelected
+                          ? 'bg-white border-[#004d99] text-[#004d99] ring-2 ring-sky-300 ring-offset-1 shadow-2xs font-bold'
+                          : 'bg-white/80 border-slate-200 text-slate-700 hover:bg-white hover:border-sky-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="material-symbols-outlined text-[16px] text-sky-700">
+                          {opt.icon}
+                        </span>
+                        {isSelected && (
+                          <span className="material-symbols-outlined text-[14px] text-[#004d99]">
+                            check_circle
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs font-bold text-slate-800">{opt.label}</div>
+                      <div className="text-[10px] text-slate-500 truncate">{opt.desc}</div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Estadísticas de fotos disponibles en las actas seleccionadas */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[10.5px] text-sky-900 pt-1.5 border-t border-sky-200/60">
+                <div className="flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[14px] text-sky-600">info</span>
+                  <span>
+                    {photoCountStats.elementsWithMultiplePhotos > 0
+                      ? `${photoCountStats.elementsWithMultiplePhotos} de ${photoCountStats.totalElements} elementos tienen múltiples fotos (hasta ${photoCountStats.maxPhotosInSingleElement} capturas registradas).`
+                      : `Total de ${photoCountStats.totalPhotos} fotos registradas en el alcance seleccionado.`}
+                  </span>
+                </div>
+                <span className="text-[10px] text-sky-800 font-semibold shrink-0">
+                  {photosPerMemory === 1
+                    ? '1 foto por memoria'
+                    : photosPerMemory === 'all'
+                    ? 'Todas las fotos posibles'
+                    : `Hasta ${photosPerMemory} fotos por memoria`}
+                </span>
+              </div>
+            </div>
+
+            {/* 5. Nomenclatura de la Memoria Técnica de acuerdo al Ítem del Acta */}
             <div className="bg-amber-50/50 border border-amber-200/80 rounded-xl p-3.5 space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-amber-900 uppercase tracking-wide flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-[17px] text-amber-700">label_important</span>
-                  4. Formato de Título de la Ficha / Memoria:
+                  5. Formato de Título de la Ficha / Memoria:
                 </label>
                 <span className="text-[10px] bg-amber-200/70 text-amber-900 font-semibold px-2 py-0.5 rounded-full">
                   Rotulación
@@ -582,11 +683,11 @@ export const ActaPdfReportModal: React.FC<ActaPdfReportModalProps> = ({
               </div>
             </div>
 
-            {/* 5. Tarjeta de Contenido que se Generará */}
+            {/* 6. Tarjeta de Contenido que se Generará */}
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2 text-xs">
               <div className="font-bold text-slate-700 flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-[16px] text-[#004d99]">info</span>
-                Resumen del Dossier a Generar:
+                6. Resumen del Dossier a Generar:
               </div>
               <ul className="space-y-1.5 text-slate-600 pl-5 list-disc text-[11px]">
                 <li>
@@ -594,6 +695,17 @@ export const ActaPdfReportModal: React.FC<ActaPdfReportModalProps> = ({
                 </li>
                 <li>
                   <strong className="text-slate-800">Fichas con Flechas Direccionales:</strong> Foto de campo + mini-croquis con flecha roja de alta visibilidad indicando la ubicación exacta.
+                </li>
+                <li>
+                  <strong className="text-slate-800">Evidencias por Memoria:</strong>{' '}
+                  <span className="text-[#004d99] font-medium">
+                    {photosPerMemory === 1
+                      ? '1 foto principal (portada técnica)'
+                      : photosPerMemory === 'all'
+                      ? 'Todas las evidencias registradas en el elemento'
+                      : `Hasta ${photosPerMemory} fotos por memoria técnica`}
+                  </span>
+                  .
                 </li>
                 <li>
                   <strong className="text-slate-800">Segmentación Contractual:</strong>{' '}
