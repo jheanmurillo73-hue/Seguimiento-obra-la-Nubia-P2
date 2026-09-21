@@ -1404,14 +1404,12 @@ export const DatabaseTableView: React.FC<DatabaseTableViewProps> = ({
                       <div className="flex items-start justify-between gap-1">
                         <div>
                           <div className="font-bold text-sm text-[#071e27] truncate">
-                            {photo.cameraCode ? (
-                              <span className="text-[#004d99]">Cámara {photo.cameraCode}</span>
-                            ) : (
-                              photo.name
-                            )}
+                            {photo.name}
                           </div>
-                          <div className="text-[11px] text-[#727783] font-mono mt-0.5 truncate">
-                            {photo.displayId || photo.id.slice(0, 8)} · {photo.name}
+                          <div className="text-[11px] text-[#727783] flex items-center gap-1.5 mt-0.5 truncate">
+                            <span className="font-mono text-slate-500 font-semibold">{photo.displayId || photo.id.slice(0, 8)}</span>
+                            <span>•</span>
+                            <span className="truncate">{photo.location}</span>
                           </div>
                         </div>
 

@@ -39,7 +39,6 @@ import { DashboardView } from './components/DashboardView';
 import { PhotoDetailView } from './components/PhotoDetailView';
 import { UploadPhotoView } from './components/UploadPhotoView';
 import { SettingsView } from './components/SettingsView';
-import { HistoryView } from './components/HistoryView';
 import { ActivityView } from './components/ActivityView';
 import { MapView } from './components/MapView';
 import { DatabaseTableView } from './components/DatabaseTableView';
@@ -830,6 +829,13 @@ export default function App() {
       return;
     }
 
+    if (tab === 'history' || tab === 'collections') {
+      setSelectedPhotoId(null);
+      setCurrentTab('dashboard');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
     const isOperationalModule = MODULE_DEFINITIONS.some((module) => module.id === tab);
     if (isOperationalModule && !canAccessModule(userAccess, tab as AppModule)) {
       showToast('Tu usuario no tiene permiso para acceder a este módulo.', 'error');
@@ -992,12 +998,21 @@ export default function App() {
                 canManageActaAssignment={userAccess.role === 'admin'}
               />
             ) : currentTab === 'history' || currentTab === 'collections' ? (
-              <HistoryView
+              <DashboardView
                 photos={photos}
+                inspector={inspector}
+                initialSubTab="galeria"
                 onSelectPhoto={handleSelectPhoto}
-                onUpdatePhoto={handleUpdatePhoto}
+                onUpdatePhotoTitle={handleUpdatePhotoTitle}
                 onDeletePhoto={handleDeletePhoto}
                 onNavigateToUpload={() => handleTabChange('upload')}
+                onNavigateToMap={(targetPhoto) => {
+                  if (targetPhoto) {
+                    setSelectedPhotoId(targetPhoto.id);
+                  }
+                  handleTabChange('map');
+                }}
+                onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
               />
             ) : currentTab === 'activity' ? (
               <ActivityView

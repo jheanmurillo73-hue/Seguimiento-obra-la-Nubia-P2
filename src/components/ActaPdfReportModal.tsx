@@ -683,43 +683,25 @@ export const ActaPdfReportModal: React.FC<ActaPdfReportModalProps> = ({
               </div>
             </div>
 
-            {/* 6. Tarjeta de Contenido que se Generará */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2 text-xs">
-              <div className="font-bold text-slate-700 flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[16px] text-[#004d99]">info</span>
-                6. Resumen del Dossier a Generar:
-              </div>
-              <ul className="space-y-1.5 text-slate-600 pl-5 list-disc text-[11px]">
-                <li>
-                  <strong className="text-slate-800">Lámina de Plano General:</strong> Trazados en alta resolución, rotulación en cajetín con número de acta {selectedItemSegment !== 'TODOS' ? `e ítem ${selectedItemSegment}` : ''} y llamadas direccionales [1], [2]...
-                </li>
-                <li>
-                  <strong className="text-slate-800">Fichas con Flechas Direccionales:</strong> Foto de campo + mini-croquis con flecha roja de alta visibilidad indicando la ubicación exacta.
-                </li>
-                <li>
-                  <strong className="text-slate-800">Evidencias por Memoria:</strong>{' '}
-                  <span className="text-[#004d99] font-medium">
-                    {photosPerMemory === 1
-                      ? '1 foto principal (portada técnica)'
-                      : photosPerMemory === 'all'
-                      ? 'Todas las evidencias registradas en el elemento'
-                      : `Hasta ${photosPerMemory} fotos por memoria técnica`}
+            {/* Resumen Compacto del Dossier a Generar */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[18px] text-[#004d99]">description</span>
+                <div>
+                  <span className="font-bold text-slate-800">
+                    {selectedActa === 'TODAS' ? 'Todas las Actas' : selectedActa}
                   </span>
-                  .
-                </li>
-                <li>
-                  <strong className="text-slate-800">Segmentación Contractual:</strong>{' '}
-                  {selectedItemSegment === 'TODOS'
-                    ? 'Informe completo con todos los ítems y elementos del acta.'
-                    : `Informe filtrado exclusivamente para el Ítem ${selectedItemSegment} (${currentItemObj?.description.slice(0, 45)}...).`}
-                </li>
-              </ul>
-              <div className="pt-2 border-t border-slate-200 flex flex-wrap items-center justify-between text-slate-700 text-xs">
+                  <span className="text-slate-500 ml-1.5 font-medium">
+                    {selectedItemSegment === 'TODOS' ? '• Catálogo completo' : `• Ítem ${selectedItemSegment}`}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 text-slate-700">
                 <span>
-                  Elementos a procesar: <strong className="text-[#004d99]">{totalElements}</strong>
+                  Elementos: <strong className="text-[#004d99] font-bold">{totalElements}</strong>
                 </span>
                 <span>
-                  Estimación de páginas: <strong>~{estimatedPages} págs.</strong>
+                  Estimado: <strong className="text-slate-900 font-bold">~{estimatedPages} págs</strong>
                 </span>
               </div>
             </div>

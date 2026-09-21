@@ -17,6 +17,14 @@ import { ActaPdfReportModal } from './ActaPdfReportModal';
 import { BottomSheet } from './BottomSheet';
 import { PlanFloatingDock } from './PlanFloatingDock';
 import { ActasModalDialog } from './ActasModalDialog';
+import { PlanAdvancedFilterModal } from './PlanAdvancedFilterModal';
+import {
+  PlanAdvancedFilters,
+  DEFAULT_PLAN_ADVANCED_FILTERS,
+  isAdvancedFilterActive,
+  photoMatchesAdvancedFilters,
+  getAdvancedFilterSummary,
+} from '../lib/planAdvancedFilterUtils';
 import { getActaTheme } from '../services/obraAnalyticsService';
 
 interface MapViewProps {
@@ -435,6 +443,18 @@ export const MapView: React.FC<MapViewProps> = ({
   const [isDraggingArea, setIsDraggingArea] = useState(false);
   const [lastSelectedAreaCount, setLastSelectedAreaCount] = useState<number | null>(null);
   const [isBulkEditModalOpen, setIsBulkEditModalOpen] = useState(false);
+  const [advancedFilters, setAdvancedFilters] = useState<PlanAdvancedFilters>(() => {
+    try {
+      const saved = localStorage.getItem('photovault_plan_advanced_filters');
+      if (saved) {
+        return { ...DEFAULT_PLAN_ADVANCED_FILTERS, ...JSON.parse(saved) };
+      }
+    } catch {
+      // fallback
+    }
+    return DEFAULT_PLAN_ADVANCED_FILTERS;
+  });
+  const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState(false);
   const [photosPendingDeletion, setPhotosPendingDeletion] = useState<InspectionPhoto[]>([]);
   const [dragTarget, setDragTarget] = useState<DragTarget | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState<boolean>(false);
@@ -914,8 +934,22 @@ export const MapView: React.FC<MapViewProps> = ({
     }
   };
 
+  const isAdvFilterActive = useMemo(() => isAdvancedFilterActive(advancedFilters), [advancedFilters]);
+  const advancedFilterSummary = useMemo(() => getAdvancedFilterSummary(advancedFilters), [advancedFilters]);
+
+  // Persistir filtros avanzados al cambiar
+  useEffect(() => {
+    try {
+      localStorage.setItem('photovault_plan_advanced_filters', JSON.stringify(advancedFilters));
+    } catch {
+      // ignore
+    }
+  }, [advancedFilters]);
+
   const visiblePhotos = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
+    const hasAdv = isAdvancedFilterActive(advancedFilters);
+
     return photos.filter((photo) => {
       const type = getElementType(photo);
       const belongsToArea = selectedPlanArea === 'civil'
@@ -929,12 +963,18 @@ export const MapView: React.FC<MapViewProps> = ({
       if (activeFilter === 'pending' && !pendingPhotos.some((pending) => pending.id === photo.id)) return false;
       if (activeFilter === 'not_started' && !isNotStarted(photo)) return false;
       if (activeFilter !== 'all' && activeFilter !== 'pending' && activeFilter !== 'not_started' && type !== activeFilter) return false;
+
+      // Filtro avanzado de semanas de ejecución, fechas, estados y tipos
+      if (hasAdv && !photoMatchesAdvancedFilters(photo, advancedFilters)) {
+        return false;
+      }
+
       if (!query) return true;
       return [photo.name, photo.cameraCode, photo.tramo, photo.location, photo.metraje]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(query));
     });
-  }, [activeFilter, pendingPhotos, photos, searchQuery, selectedPlanArea, selectedSector]);
+  }, [activeFilter, advancedFilters, pendingPhotos, photos, searchQuery, selectedPlanArea, selectedSector]);
 
   const positionedPhotos = useMemo(
     () => visiblePhotos.filter((photo) => isPlaced(photo)),
@@ -1971,6 +2011,26 @@ export const MapView: React.FC<MapViewProps> = ({
           </button>
         ))}
         <span className="mx-1 hidden h-6 w-px bg-[#b8ced9] sm:block" aria-hidden="true" />
+        {/* Botón Filtros Avanzados de Obra (Semanas Lun-Dom, Fechas, Estados, Tipos) */}
+        <button
+          type="button"
+          onClick={() => setIsAdvancedFilterOpen(true)}
+          className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold shadow-sm transition ${
+            isAdvFilterActive
+              ? 'border-[#004d99] bg-[#004d99] text-white ring-2 ring-[#004d99]/25 shadow-xs'
+              : 'border-[#9fb5c5] bg-white text-[#173f58] hover:bg-[#eaf3f8]'
+          }`}
+          title="Filtros avanzados por semanas de ejecución (Lun–Dom), rangos de fechas y estados de avance"
+        >
+          <span className="material-symbols-outlined text-[16px]">{isAdvFilterActive ? 'filter_alt' : 'tune'}</span>
+          <span>Filtros Avanzados</span>
+          {isAdvFilterActive && (
+            <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-400 px-1 font-mono text-[9px] font-extrabold text-slate-950">
+              {visiblePhotos.length}
+            </span>
+          )}
+        </button>
+
         {/* Herramienta de Mano rápida */}
         <button
           type="button"
@@ -2054,13 +2114,33 @@ export const MapView: React.FC<MapViewProps> = ({
         </button>
 
         <div className="flex items-center gap-2">
+          {/* Botón Filtros Avanzados Móvil */}
+          <button
+            type="button"
+            onClick={() => setIsAdvancedFilterOpen(true)}
+            className={`pointer-events-auto flex h-10 items-center gap-1.5 rounded-xl border px-2.5 text-xs font-bold shadow-md transition active:scale-95 ${
+              isAdvFilterActive
+                ? 'border-[#004d99] bg-[#004d99] text-white ring-2 ring-[#004d99]/25'
+                : 'border-[#9dbbc9]/90 bg-white/95 text-[#073f74] backdrop-blur-md'
+            }`}
+            title="Filtros avanzados por semanas de ejecución y fechas"
+          >
+            <span className="material-symbols-outlined text-[18px]">{isAdvFilterActive ? 'filter_alt' : 'tune'}</span>
+            <span className="hidden xs:inline">Filtros</span>
+            {isAdvFilterActive && (
+              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-400 px-1 font-mono text-[9px] font-extrabold text-slate-950">
+                {visiblePhotos.length}
+              </span>
+            )}
+          </button>
+
           <button
             type="button"
             onClick={() => setIsMobileToolsOpen(true)}
             className="pointer-events-auto flex h-10 items-center gap-1.5 rounded-xl bg-[#073f74] px-3 text-xs font-bold text-white shadow-md transition active:scale-95"
             title="Abrir herramientas, filtros y búsqueda"
           >
-            <span className="material-symbols-outlined text-[18px]">tune</span>
+            <span className="material-symbols-outlined text-[18px]">build</span>
             <span>Herramientas</span>
             {activeFilter !== 'all' && (
               <span className="flex h-2 w-2 rounded-full bg-amber-400" />
@@ -2080,6 +2160,34 @@ export const MapView: React.FC<MapViewProps> = ({
       </div>
 
       <main className="relative min-h-0 flex-1 overflow-hidden p-0 md:p-5 h-full w-full touch-none">
+        {/* Banner flotante de Filtros Avanzados activos (Semanas Lun-Dom, fechas, estados) */}
+        {isAdvFilterActive && (
+          <div className="pointer-events-auto absolute top-14 md:top-6 left-1/2 -translate-x-1/2 z-30 flex max-w-[92vw] items-center gap-2 rounded-full border border-indigo-200 bg-white/95 px-3.5 py-1.5 text-xs font-bold text-indigo-950 shadow-lg backdrop-blur-xs">
+            <span className="material-symbols-outlined text-[16px] text-indigo-600">filter_alt</span>
+            <span className="truncate max-w-[190px] sm:max-w-xs md:max-w-md font-medium text-slate-700">
+              Filtro: <strong className="font-bold text-indigo-900">{advancedFilterSummary}</strong>
+            </span>
+            <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-mono font-bold text-indigo-800 shrink-0">
+              {positionedPhotos.length} en plano
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsAdvancedFilterOpen(true)}
+              className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline px-1 shrink-0"
+            >
+              Modificar
+            </button>
+            <button
+              type="button"
+              onClick={() => setAdvancedFilters(DEFAULT_PLAN_ADVANCED_FILTERS)}
+              className="ml-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-rose-100 hover:text-rose-700 transition"
+              title="Quitar filtros avanzados"
+            >
+              <span className="material-symbols-outlined text-[13px]">close</span>
+            </button>
+          </div>
+        )}
+
         {/* Banner flotante de sector activo para navegación fluida */}
         {selectedSector !== 'TODOS' && (
           <div className="pointer-events-auto absolute top-14 md:top-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 rounded-full border border-blue-200 bg-white/95 px-3 py-1.5 text-xs font-bold text-blue-950 shadow-lg backdrop-blur-xs">
@@ -3389,6 +3497,16 @@ export const MapView: React.FC<MapViewProps> = ({
         initialActaFilter={actaPdfInitialFilter}
       />
 
+      {/* Panel Modal de Filtros Avanzados (Semanas Lun-Dom, Fechas, Estados, Tipos) */}
+      <PlanAdvancedFilterModal
+        isOpen={isAdvancedFilterOpen}
+        onClose={() => setIsAdvancedFilterOpen(false)}
+        currentFilters={advancedFilters}
+        onApplyFilters={(newFilters) => setAdvancedFilters(newFilters)}
+        onResetFilters={() => setAdvancedFilters(DEFAULT_PLAN_ADVANCED_FILTERS)}
+        photos={photos}
+      />
+
       {/* Controles flotantes móviles de zoom y navegación (< 768px) */}
       <div className="fixed bottom-6 left-3 z-30 md:hidden flex flex-col gap-2">
         <div className="flex flex-col rounded-xl bg-white/95 border border-[#9dbbc9]/90 shadow-xl overflow-hidden backdrop-blur-md">
@@ -3594,6 +3712,39 @@ export const MapView: React.FC<MapViewProps> = ({
         title="Herramientas y Filtros del Plano"
       >
         <div className="space-y-4 pb-8">
+          {/* Acceso a Filtros Avanzados en Móvil */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsMobileToolsOpen(false);
+              setIsAdvancedFilterOpen(true);
+            }}
+            className={`w-full flex items-center justify-between p-3 rounded-xl border text-xs font-bold transition shadow-xs ${
+              isAdvFilterActive
+                ? 'border-[#004d99] bg-[#004d99] text-white'
+                : 'border-blue-200 bg-blue-50/70 text-[#004d99] hover:bg-blue-100'
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="material-symbols-outlined text-[22px]">
+                {isAdvFilterActive ? 'filter_alt' : 'tune'}
+              </span>
+              <div className="text-left">
+                <div className="text-xs font-bold">Filtros Avanzados de Obra</div>
+                <div className={`text-[10px] font-medium mt-0.5 ${isAdvFilterActive ? 'text-white/80' : 'text-slate-500'}`}>
+                  {isAdvFilterActive ? advancedFilterSummary : 'Semanas de ejecución (Lun-Dom) y fechas'}
+                </div>
+              </div>
+            </div>
+            {isAdvFilterActive ? (
+              <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-mono font-black text-slate-900">
+                {visiblePhotos.length} en plano
+              </span>
+            ) : (
+              <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+            )}
+          </button>
+
           {/* Búsqueda rápida */}
           <div className="relative">
             <span className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-[#5d7887]">search</span>

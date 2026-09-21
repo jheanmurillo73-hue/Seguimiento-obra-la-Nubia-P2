@@ -5,6 +5,7 @@ import { ObraControlDashboard } from './ObraControlDashboard';
 interface DashboardViewProps {
   photos: InspectionPhoto[];
   inspector?: InspectorProfile;
+  initialSubTab?: 'control_obra' | 'galeria';
   onSelectPhoto: (photo: InspectionPhoto) => void;
   onUpdatePhotoTitle: (id: string, newTitle: string) => void;
   onDeletePhoto: (id: string) => void;
@@ -16,6 +17,7 @@ interface DashboardViewProps {
 export const DashboardView: React.FC<DashboardViewProps> = ({
   photos,
   inspector,
+  initialSubTab = 'control_obra',
   onSelectPhoto,
   onUpdatePhotoTitle,
   onDeletePhoto,
@@ -23,7 +25,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onNavigateToMap,
   onOpenSupabaseModal,
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'control_obra' | 'galeria'>('control_obra');
+  const [activeSubTab, setActiveSubTab] = useState<'control_obra' | 'galeria'>(initialSubTab);
   const [filter, setFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [photoToDelete, setPhotoToDelete] = useState<InspectionPhoto | null>(null);
@@ -315,9 +317,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </span>
               </button>
 
-              {/* Bottom Left Quick ID Pill */}
-              <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-xs text-white text-[11px] font-mono px-2 py-0.5 rounded">
-                {photo.displayId}
+              {/* Bottom Left Quick ID Pill: Identificador técnico principal */}
+              <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-xs text-white text-[11px] font-mono px-2 py-0.5 rounded font-bold">
+                {photo.cameraCode || (photo.tramo ? `T-${photo.tramo}` : photo.displayId)}
               </div>
 
               {/* Hazard indicator badge if applicable */}
@@ -358,11 +360,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         {photo.metraje}m
                       </span>
                     )}
-                    <span className="bg-[#004d99]/10 text-[#004d99] font-bold text-[10px] px-1.5 py-0.2 rounded">
-                      {photo.cameraCode || 'SB850'}
-                    </span>
                     {photo.cameraType && (
-                      <span className={`font-bold text-[10px] px-1 py-0.2 rounded ${
+                      <span className={`font-bold text-[10px] px-1.5 py-0.2 rounded ${
                         photo.cameraType === 'MT'
                           ? 'bg-sky-100 text-sky-800'
                           : photo.cameraType === 'BT'

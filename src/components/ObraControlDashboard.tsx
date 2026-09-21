@@ -42,9 +42,6 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
   const [filterMode, setFilterMode] = useState<'INCLUSIVE' | 'EXCLUSIVE'>('INCLUSIVE');
   const [soloPendientes, setSoloPendientes] = useState<boolean>(false);
 
-  // Estados de la tabla y navegación
-  const [searchTableQuery, setSearchTableQuery] = useState<string>('');
-  const [tableFilterType, setTableFilterType] = useState<'TODOS' | 'CAMARA' | 'TUBERIA'>('TODOS');
   const [dashboardTab, setDashboardTab] = useState<'RESUMEN' | 'CONTRASTE' | 'ACTAS' | 'BALANCE'>('RESUMEN');
 
   // Vista y filtros específicos dentro de la tarjeta de Conteo de Cámaras
@@ -117,29 +114,6 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
     if (!rawCamaras?.porActa) return 0;
     return Object.values(rawCamaras.porActa).reduce((acc, curr) => acc + (curr.total || 0), 0);
   }, [rawCamaras?.porActa]);
-
-  // Filtrar la tabla de detalle según búsqueda y tipo de elemento
-  const displayItems = useMemo(() => {
-    return filteredItems.filter((photo) => {
-      const isCamara = photo.elementType === 'camara' || (!photo.elementType && Boolean(photo.cameraCode));
-      const isTuberia = photo.elementType === 'tuberia' || (!photo.elementType && Boolean(photo.tramo || photo.metraje));
-
-      if (tableFilterType === 'CAMARA' && !isCamara) return false;
-      if (tableFilterType === 'TUBERIA' && !isTuberia) return false;
-
-      if (!searchTableQuery) return true;
-      const q = searchTableQuery.toLowerCase();
-      return (
-        photo.name.toLowerCase().includes(q) ||
-        (photo.displayId || '').toLowerCase().includes(q) ||
-        (photo.cameraType || '').toLowerCase().includes(q) ||
-        (photo.tramo || '').toLowerCase().includes(q) ||
-        (photo.acta || '').toLowerCase().includes(q) ||
-        (photo.executionStatus || '').toLowerCase().includes(q) ||
-        (photo.fieldNotes || '').toLowerCase().includes(q)
-      );
-    });
-  }, [filteredItems, searchTableQuery, tableFilterType]);
 
   // Funciones para manipular los segmentadores unificados
   const toggleSector = (sectorKey: 'I1' | 'I2' | 'TRONCAL' | 'OTRO') => {
@@ -782,22 +756,14 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
                       <div className="bg-indigo-600 h-2 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, activeSectorMetric.mtAvance)}%` }} />
                     </div>
                   </div>
-
-                  {/* Detalle Terminadas vs En Proceso por Tipo MT */}
-                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 mt-2.5 pt-2 border-t border-slate-200/70 bg-white/80 px-2 py-1.5 rounded-lg">
-                    <span className="text-emerald-700 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                      Terminadas: <strong className="font-extrabold">{rawCamaras?.porTipo.mt.terminadas ?? 0}</strong>
-                    </span>
-                    <span className="text-amber-700 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                      En Proceso: <strong className="font-extrabold">{rawCamaras?.porTipo.mt.enProceso ?? 0}</strong>
-                    </span>
-                  </div>
                 </div>
-                <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-200/60 mt-2.5">
-                  <span>{activeSectorMetric.mtIntervenidas} en campo</span>
-                  <span className="font-medium text-slate-600">Base: {activeSectorMetric.mtPresupuestoBaseline || activeSectorMetric.mtTotal} un</span>
+                <div className="flex items-center justify-between text-[11px] text-slate-600 pt-2 border-t border-slate-200/70 mt-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-emerald-700 font-bold">Terminadas: {rawCamaras?.porTipo.mt.terminadas ?? 0}</span>
+                    <span>•</span>
+                    <span className="text-amber-700 font-bold">En proceso: {rawCamaras?.porTipo.mt.enProceso ?? 0}</span>
+                  </div>
+                  <span className="text-slate-400 font-medium">{activeSectorMetric.mtIntervenidas} en campo</span>
                 </div>
               </div>
 
@@ -823,22 +789,14 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
                       <div className="bg-amber-600 h-2 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, activeSectorMetric.btAvance)}%` }} />
                     </div>
                   </div>
-
-                  {/* Detalle Terminadas vs En Proceso por Tipo BT */}
-                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 mt-2.5 pt-2 border-t border-slate-200/70 bg-white/80 px-2 py-1.5 rounded-lg">
-                    <span className="text-emerald-700 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                      Terminadas: <strong className="font-extrabold">{rawCamaras?.porTipo.bt.terminadas ?? 0}</strong>
-                    </span>
-                    <span className="text-amber-700 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                      En Proceso: <strong className="font-extrabold">{rawCamaras?.porTipo.bt.enProceso ?? 0}</strong>
-                    </span>
-                  </div>
                 </div>
-                <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-200/60 mt-2.5">
-                  <span>{activeSectorMetric.btIntervenidas} en campo</span>
-                  <span className="font-medium text-slate-600">Base: {activeSectorMetric.btPresupuestoBaseline || activeSectorMetric.btTotal} un</span>
+                <div className="flex items-center justify-between text-[11px] text-slate-600 pt-2 border-t border-slate-200/70 mt-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-emerald-700 font-bold">Terminadas: {rawCamaras?.porTipo.bt.terminadas ?? 0}</span>
+                    <span>•</span>
+                    <span className="text-amber-700 font-bold">En proceso: {rawCamaras?.porTipo.bt.enProceso ?? 0}</span>
+                  </div>
+                  <span className="text-slate-400 font-medium">{activeSectorMetric.btIntervenidas} en campo</span>
                 </div>
               </div>
 
@@ -864,22 +822,14 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
                       <div className="bg-teal-600 h-2 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, activeSectorMetric.datosAvance)}%` }} />
                     </div>
                   </div>
-
-                  {/* Detalle Terminadas vs En Proceso por Tipo DATOS */}
-                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 mt-2.5 pt-2 border-t border-slate-200/70 bg-white/80 px-2 py-1.5 rounded-lg">
-                    <span className="text-emerald-700 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                      Terminadas: <strong className="font-extrabold">{rawCamaras?.porTipo.datos.terminadas ?? 0}</strong>
-                    </span>
-                    <span className="text-amber-700 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                      En Proceso: <strong className="font-extrabold">{rawCamaras?.porTipo.datos.enProceso ?? 0}</strong>
-                    </span>
-                  </div>
                 </div>
-                <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-200/60 mt-2.5">
-                  <span>{activeSectorMetric.datosIntervenidas} en campo</span>
-                  <span className="font-medium text-slate-600">Base: {activeSectorMetric.datosPresupuestoBaseline || activeSectorMetric.datosTotal} un</span>
+                <div className="flex items-center justify-between text-[11px] text-slate-600 pt-2 border-t border-slate-200/70 mt-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-emerald-700 font-bold">Terminadas: {rawCamaras?.porTipo.datos.terminadas ?? 0}</span>
+                    <span>•</span>
+                    <span className="text-amber-700 font-bold">En proceso: {rawCamaras?.porTipo.datos.enProceso ?? 0}</span>
+                  </div>
+                  <span className="text-slate-400 font-medium">{activeSectorMetric.datosIntervenidas} en campo</span>
                 </div>
               </div>
             </div>
@@ -1604,7 +1554,7 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
                 Distribución Operativa
               </h3>
               <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
-                {displayItems.length} Elementos
+                {filteredItems.length} Elementos
               </span>
             </div>
             <p className="text-xs text-[#64748b]">Estado físico actual y volumen de ítems</p>
@@ -1628,324 +1578,6 @@ export const ObraControlDashboard: React.FC<ObraControlDashboardProps> = ({
             </div>
           </div>
         </div>
-      </div>
-
-      {/* 5. Tabla de Detalle y Auditoría de Pendientes (Expandible y Filtrable) */}
-      <div className="bg-white border border-[#c2c6d4] rounded-2xl p-4 sm:p-5 shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#e2e8f0] pb-4">
-          <div>
-            <h3 className="text-sm sm:text-base font-bold text-[#0f172a] uppercase tracking-wide flex items-center gap-2">
-              <span className="material-symbols-outlined text-[20px] text-[#004d99]">table_rows</span>
-              <span>Detalle de Elementos y Auditoría de Obra</span>
-            </h3>
-            <p className="text-xs text-[#64748b] mt-0.5">
-              Mostrando {displayItems.length} registros según los filtros seleccionados
-            </p>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
-            {/* Filtro Tipo */}
-            <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200 text-xs">
-              <button
-                type="button"
-                onClick={() => setTableFilterType('TODOS')}
-                className={`min-h-[44px] sm:min-h-[36px] px-3 py-1.5 rounded-lg font-bold transition-all text-center flex items-center justify-center ${
-                  tableFilterType === 'TODOS' ? 'bg-white text-[#004d99] shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Todos
-              </button>
-              <button
-                type="button"
-                onClick={() => setTableFilterType('CAMARA')}
-                className={`min-h-[44px] sm:min-h-[36px] px-3 py-1.5 rounded-lg font-bold transition-all text-center flex items-center justify-center ${
-                  tableFilterType === 'CAMARA' ? 'bg-white text-[#004d99] shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Cámaras
-              </button>
-              <button
-                type="button"
-                onClick={() => setTableFilterType('TUBERIA')}
-                className={`min-h-[44px] sm:min-h-[36px] px-3 py-1.5 rounded-lg font-bold transition-all text-center flex items-center justify-center ${
-                  tableFilterType === 'TUBERIA' ? 'bg-white text-[#004d99] shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Tramos
-              </button>
-            </div>
-
-            {/* Buscador interno */}
-            <div className="relative w-full sm:w-auto">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">
-                search
-              </span>
-              <input
-                type="text"
-                value={searchTableQuery}
-                onChange={(e) => setSearchTableQuery(e.target.value)}
-                placeholder="Buscar código, tramo..."
-                className="w-full min-h-[44px] sm:min-h-[38px] bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm text-[#0f172a] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#004d99]"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* VISTA MÓVIL: Tarjetas fluidas */}
-        <div className="block sm:hidden space-y-3">
-          {displayItems.length === 0 ? (
-            <div className="py-8 text-center text-slate-400 text-sm">
-              No se encontraron elementos con los filtros aplicados.
-            </div>
-          ) : (
-            displayItems.slice(0, 50).map((photo) => {
-              const isCam = photo.elementType === 'camara' || (!photo.elementType && Boolean(photo.cameraCode));
-              const isTerminado = photo.executionStatus === 'Terminado';
-              const isEnProceso = photo.executionStatus === 'En proceso';
-              const progressPct = getPhotoProgressPercentage(photo);
-              const linearInfo = getPhotoRealLinearMeters(photo);
-              const realMeters = linearInfo.totalLinearMeters;
-
-              return (
-                <div
-                  key={photo.id}
-                  onClick={() => onSelectPhoto(photo)}
-                  className="bg-slate-50 border border-slate-200 rounded-2xl p-4 shadow-2xs active:bg-blue-50 transition-colors space-y-2.5"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="font-bold text-sm text-[#0f172a]">{photo.name}</div>
-                      <div className="text-[11px] text-slate-500 font-mono mt-0.5">{photo.displayId} · {photo.location}</div>
-                    </div>
-                    <span
-                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-bold text-[11px] shrink-0 ${
-                        isTerminado
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : isEnProceso
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-slate-200 text-slate-700'
-                      }`}
-                    >
-                      <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                      {photo.executionStatus || 'No iniciado'}
-                    </span>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2 text-xs">
-                    {isCam ? (
-                      <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 font-bold">
-                        Cámara {photo.cameraType || photo.categoryLabel}
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded-md bg-teal-100 text-teal-800 font-bold">
-                        {realMeters.toFixed(1)} m {linearInfo.multiplier > 1 ? `(${linearInfo.multiplier}×${linearInfo.distanceMeters.toFixed(1)}m)` : ''}
-                      </span>
-                    )}
-                    {(photo.acta || photo.actaItem?.code) && (
-                      <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 font-bold">
-                        {photo.acta || photo.actaItem?.code}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Barra de progreso */}
-                  <div>
-                    <div className="flex items-center justify-between text-xs mb-1">
-                      <span className="text-slate-500 font-medium">Avance físico:</span>
-                      <span className="font-bold text-slate-800 font-mono">{progressPct}%</span>
-                    </div>
-                    <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                      <div
-                        className={`h-2 rounded-full ${getProgressColor(progressPct)}`}
-                        style={{ width: `${progressPct}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {photo.fieldNotes && (
-                    <div className="text-xs text-slate-600 bg-white p-2 rounded-xl border border-slate-200">
-                      {photo.fieldNotes}
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between pt-1">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onNavigateToMap(photo);
-                      }}
-                      className="min-h-[44px] px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-[#004d99] flex items-center gap-1.5 shadow-2xs"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">location_searching</span>
-                      <span>Ver en Plano</span>
-                    </button>
-                    <span className="text-xs text-slate-400 font-medium flex items-center gap-1">
-                      <span>Tocar para ver</span>
-                      <span className="material-symbols-outlined text-[16px]">chevron_right</span>
-                    </span>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-
-        {/* Contenedor Tabular (Escritorio) */}
-        <div className="hidden sm:block overflow-x-auto rounded-xl border border-[#e2e8f0]">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-[#f8fafc] text-[#475569] font-bold border-b border-[#e2e8f0]">
-              <tr>
-                <th className="py-2.5 px-3">Elemento</th>
-                <th className="py-2.5 px-3">Tipo / Red</th>
-                <th className="py-2.5 px-3">Sector</th>
-                <th className="py-2.5 px-3">Acta</th>
-                <th className="py-2.5 px-3">Metraje Real</th>
-                <th className="py-2.5 px-3">% Avance</th>
-                <th className="py-2.5 px-3">Estado</th>
-                <th className="py-2.5 px-3">Observación / Pendiente</th>
-                <th className="py-2.5 px-3 text-right">Acción</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#f1f5f9]">
-              {displayItems.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="py-8 text-center text-slate-400">
-                    No se encontraron elementos con los filtros aplicados.
-                  </td>
-                </tr>
-              ) : (
-                displayItems.slice(0, 50).map((photo) => {
-                  const isCam = photo.elementType === 'camara' || (!photo.elementType && Boolean(photo.cameraCode));
-                  const isTerminado = photo.executionStatus === 'Terminado';
-                  const isEnProceso = photo.executionStatus === 'En proceso';
-                  const progressPct = getPhotoProgressPercentage(photo);
-                  const linearInfo = getPhotoRealLinearMeters(photo);
-                  const realMeters = linearInfo.totalLinearMeters;
-                  const multiplier = linearInfo.multiplier;
-
-                  return (
-                    <tr
-                      key={photo.id}
-                      onClick={() => onSelectPhoto(photo)}
-                      className="hover:bg-blue-50/50 cursor-pointer transition-colors"
-                    >
-                      {/* Nombre / ID */}
-                      <td className="py-2.5 px-3">
-                        <div className="font-bold text-[#0f172a]">{photo.name}</div>
-                        <div className="text-[10px] text-slate-500 font-mono">{photo.displayId}</div>
-                      </td>
-
-                      {/* Tipo / Red */}
-                      <td className="py-2.5 px-3">
-                        {isCam ? (
-                          <span className="inline-flex items-center gap-1 font-semibold text-slate-700">
-                            <span className="material-symbols-outlined text-[14px] text-blue-600">videocam</span>
-                            Cámara {photo.cameraType || 'MT'}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 font-semibold text-teal-700">
-                            <span className="material-symbols-outlined text-[14px] text-teal-600">linear_scale</span>
-                            Tramo {photo.tramo || 'Ducto'}
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Sector */}
-                      <td className="py-2.5 px-3">
-                        <span className="px-2 py-0.5 rounded-md font-semibold text-[10px] bg-slate-100 text-slate-800 border border-slate-200">
-                          {photo.sector || (photo.name.includes('I1') ? 'Intersección 1' : photo.name.includes('I2') ? 'Intersección 2' : photo.name.includes('TRONCAL') ? 'Troncal' : 'Otros')}
-                        </span>
-                      </td>
-
-                      {/* Acta */}
-                      <td className="py-2.5 px-3">
-                        <span className="text-slate-700 font-medium">
-                          {photo.acta || <span className="text-slate-400 italic">Sin Acta</span>}
-                        </span>
-                      </td>
-
-                      {/* Metraje Real */}
-                      <td className="py-2.5 px-3 font-mono font-semibold text-slate-800">
-                        {!isCam && realMeters > 0 ? (
-                          <div>
-                            <span className="text-[#004d99] font-bold">{realMeters.toFixed(1)} m</span>
-                            {multiplier > 1 && (
-                              <span className="block text-[9px] text-slate-500 font-normal">
-                                {multiplier}× ({photo.metraje} m)
-                              </span>
-                            )}
-                          </div>
-                        ) : photo.metraje ? (
-                          `${photo.metraje} m`
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-
-                      {/* % Avance */}
-                      <td className="py-2.5 px-3">
-                        <div className="flex items-center gap-1.5 min-w-[70px]">
-                          <div className="w-12 bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                            <div
-                              className={`h-1.5 rounded-full ${getProgressColor(progressPct)}`}
-                              style={{ width: `${progressPct}%` }}
-                            />
-                          </div>
-                          <span className="font-mono font-bold text-[11px] text-slate-700">
-                            {progressPct}%
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Estado */}
-                      <td className="py-2.5 px-3">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold text-[10px] ${
-                            isTerminado
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : isEnProceso
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-slate-100 text-slate-700'
-                          }`}
-                        >
-                          <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                          {photo.executionStatus || 'No iniciado'}
-                        </span>
-                      </td>
-
-                      {/* Observación */}
-                      <td className="py-2.5 px-3 max-w-xs truncate text-slate-600" title={photo.fieldNotes || ''}>
-                        {photo.fieldNotes || <span className="text-slate-400 italic">Sin observaciones</span>}
-                      </td>
-
-                      {/* Acción */}
-                      <td className="py-2.5 px-3 text-right">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onNavigateToMap(photo);
-                          }}
-                          className="p-1 text-slate-400 hover:text-[#004d99] hover:bg-slate-100 rounded-lg"
-                          title="Ubicar en el plano"
-                        >
-                          <span className="material-symbols-outlined text-[18px]">location_searching</span>
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {displayItems.length > 50 && (
-          <div className="text-center text-xs text-slate-500 py-1">
-            Mostrando los primeros 50 de {displayItems.length} registros. Usa los filtros o buscador para acotar.
-          </div>
-        )}
       </div>
       </>
       )}
